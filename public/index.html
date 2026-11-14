@@ -152,6 +152,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
 .st-facturado{background:#e8e2d6;color:#5a4a33}
 .cl-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .cl-imp{font-weight:700;white-space:nowrap}
+.cl-obra{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
 .cl-actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .cl-actions select{width:100%;flex:1 1 100%;padding:8px}
 .cl-actions .btn{flex:1;padding:8px 12px;font-size:13px;text-align:center}
@@ -289,23 +290,25 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
       <label for="o-nombre">Nombre de la obra</label>
       <input id="o-nombre" placeholder="p. ej. Coberta de fusta Hotel Casamanya">
       <label for="o-cliente">Cliente</label>
-      <input id="o-cliente">
-      <div class="grid2">
-        <div><label for="o-nif">NIF</label><input id="o-nif" autocomplete="off" style="text-transform:uppercase"></div>
-        <div><label for="o-tipo">Tipo de obra</label><select id="o-tipo"></select></div>
-      </div>
+      <select id="o-cliente"></select>
+      <div class="sub" style="margin-top:4px">Los datos del cliente (NIF, dirección…) se crean en la pestaña Clientes.</div>
+      <label for="o-tipo">Tipo de obra</label>
+      <select id="o-tipo"></select>
       <input id="o-tipo-otro" placeholder="Especifica el tipo de obra" style="margin-top:8px" hidden>
-      <label for="o-dir">Dirección social</label>
-      <input id="o-dir" autocomplete="off">
       <label for="o-ubi">Ubicación de la obra</label>
       <input id="o-ubi" placeholder="Población / dirección de la obra" autocomplete="off">
       <label for="o-desp">Tiempo de desplazamiento, ida y vuelta (horas por día)</label>
       <input id="o-desp" type="number" inputmode="decimal" step="0.25" min="0" max="12" placeholder="p. ej. 1">
+      <div class="grid2">
+        <div><label for="o-importe">Importe (€)</label><input id="o-importe" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+        <div><label for="o-estado">Estado</label><select id="o-estado"></select></div>
+      </div>
       <div class="row" style="margin-top:16px">
         <button class="btn big" id="crearObra" type="button" style="margin-top:0">Crear obra</button>
         <button class="btn sec" id="cancelObra" type="button" hidden>Cancelar</button>
       </div>
     </div>
+    <div id="ob-resumen"></div>
     <div id="obrasList"></div>
   </section>
   <section id="s-perfil">
@@ -326,26 +329,21 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
     <button class="btn sec" id="pf-salir" type="button" style="width:100%;padding:10px">Salir</button>
   </section>
   <section id="s-clientes">
-    <div id="cl-resumen"></div>
     <div class="row" style="margin-bottom:10px"><button class="btn" id="cl-nuevo" type="button">+ Nuevo cliente</button></div>
     <div class="card" id="cl-form" hidden>
       <b id="cl-ftitle">Nuevo cliente</b>
-      <label for="cl-nombre">Cliente</label>
+      <label for="cl-nombre">Nombre o razón social</label>
       <input id="cl-nombre" autocomplete="off">
-      <label for="cl-proyecto">Proyecto / trabajo</label>
-      <input id="cl-proyecto" autocomplete="off" placeholder="p. ej. Porxo de fusta">
-      <div class="grid2">
-        <div><label for="cl-importe">Importe (€)</label><input id="cl-importe" inputmode="decimal" autocomplete="off" placeholder="0"></div>
-        <div><label for="cl-estado">Estado</label><select id="cl-estado"></select></div>
-      </div>
+      <label for="cl-nif">NIF</label>
+      <input id="cl-nif" autocomplete="off" style="text-transform:uppercase">
+      <label for="cl-dir">Dirección social</label>
+      <input id="cl-dir" autocomplete="off">
+      <label for="cl-contacto">Persona de contacto</label>
+      <input id="cl-contacto" autocomplete="off">
       <div class="grid2">
         <div><label for="cl-tel">Teléfono</label><input id="cl-tel" type="tel" autocomplete="off"></div>
         <div><label for="cl-email">Email</label><input id="cl-email" type="email" autocapitalize="none" autocomplete="off"></div>
       </div>
-      <label for="cl-contacto">Persona de contacto</label>
-      <input id="cl-contacto" autocomplete="off">
-      <label for="cl-obra">Obra relacionada (opcional)</label>
-      <select id="cl-obra"></select>
       <label for="cl-notas">Notas</label>
       <textarea id="cl-notas" rows="3"></textarea>
       <div class="row" style="margin-top:14px"><button class="btn" id="cl-guardar" type="button" style="flex:1">Guardar</button><button class="btn sec" id="cl-cancelar" type="button">Cancelar</button></div>
@@ -539,7 +537,7 @@ $('#o-tipo').innerHTML='<option value="">Elige…</option>'+TIPOS.map(t=>'<optio
 $('#o-tipo').onchange=()=>{$('#o-tipo-otro').hidden=$('#o-tipo').value!=='__otro'};
 function resetObraForm(){
   editObra=null;
-  ['o-nombre','o-cliente','o-nif','o-dir','o-ubi','o-desp','o-tipo-otro'].forEach(i=>$('#'+i).value='');
+  ['o-nombre','o-ubi','o-desp','o-tipo-otro','o-importe'].forEach(i=>$('#'+i).value='');$('#o-cliente').value='';$('#o-estado').value='presupuesto_pendiente';
   $('#o-tipo').value='';$('#o-tipo-otro').hidden=true;
   $('#o-title').textContent='Nueva obra';$('#crearObra').textContent='Crear obra';$('#cancelObra').hidden=true;
   updateCodeInfo();
@@ -547,8 +545,9 @@ function resetObraForm(){
 $('#cancelObra').onclick=resetObraForm;
 function startEdit(o){
   editObra=o.id;
-  $('#o-nombre').value=o.nombre||'';$('#o-cliente').value=o.cliente||'';
-  $('#o-nif').value=o.nif||'';$('#o-dir').value=o.direccion||'';$('#o-ubi').value=o.ubicacion||'';$('#o-desp').value=o.desplazamiento!=null?o.desplazamiento:'';
+  $('#o-nombre').value=o.nombre||'';fillObraCli();$('#o-cliente').value=o.clienteId||'';
+  $('#o-importe').value=o.importe?String(o.importe).replace('.',','):'';$('#o-estado').value=o.estado||'presupuesto_pendiente';
+  $('#o-ubi').value=o.ubicacion||'';$('#o-desp').value=o.desplazamiento!=null?o.desplazamiento:'';
   const tp=tipoES(o.tipo);
   if(!tp){$('#o-tipo').value='';$('#o-tipo-otro').value=''}
   else if(TIPOS.includes(tp)){$('#o-tipo').value=tp;$('#o-tipo-otro').value=''}
@@ -576,7 +575,7 @@ $('#crearObra').onclick=async()=>{
   if(tipo==='__otro'){tipo=$('#o-tipo-otro').value.trim();if(!tipo)return notice('Especifica el tipo de obra.','bad')}
   const desp=parseFloat(String($('#o-desp').value).replace(',','.'));
   if($('#o-desp').value!==''&&!(desp>=0&&desp<=12))return notice('El desplazamiento tiene que estar entre 0 y 12 horas.','bad');
-  const data={desplazamiento:isNaN(desp)?0:desp,nombre,cliente:$('#o-cliente').value.trim(),nif:$('#o-nif').value.trim().toUpperCase(),direccion:$('#o-dir').value.trim(),ubicacion:$('#o-ubi').value.trim(),tipo};
+  const data={desplazamiento:isNaN(desp)?0:desp,nombre,clienteId:$('#o-cliente').value,ubicacion:$('#o-ubi').value.trim(),tipo,importe:$('#o-importe').value,estado:$('#o-estado').value};
   try{
     if(editObra){
       await api('PATCH','/api/obras/'+editObra,data);await refresh();notice('Obra actualizada ✔','ok');
@@ -615,23 +614,49 @@ function obraName(r){
   const o=obras.find(x=>x.id===r.obraId);
   return o?(o.codigo?o.codigo+' · ':'')+o.nombre:(r.obraNombre||'(obra)');
 }
+const ESTADOS=[['presupuesto_pendiente','Presupuesto pendiente'],['presupuesto_enviado','Presupuesto enviado'],['aceptado','Aceptado'],['factura_pendiente','Factura pendiente'],['facturado','Facturado']];
+const estLabel=k=>(ESTADOS.find(e=>e[0]===k)||[0,k])[1];
+const eur=n=>(Math.round((n||0)*100)/100).toLocaleString('es-ES')+' €';
+let oFiltro='';
+$('#o-estado').innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'">'+e[1]+'</option>').join('');
+function fillObraCli(){
+  const sel=$('#o-cliente'),v=sel.value;
+  sel.innerHTML='<option value="">Sin cliente</option>'+clientes.slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'')).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.nombre)+'</option>').join('');
+  sel.value=v;
+}
 function drawObras(){
-  updateCodeInfo();
+  updateCodeInfo();fillObraCli();
+  const n=k=>obras.filter(o=>o.estado===k).length;
+  const sumE=k=>obras.filter(o=>o.estado===k).reduce((a,o)=>a+(o.importe||0),0);
+  const rs=$('#ob-resumen');
+  rs.innerHTML='<div class="card"><div class="todo">'
+    +'<div class="t'+(n('presupuesto_pendiente')?' warn':'')+'"><b>'+n('presupuesto_pendiente')+'</b>Presupuestos por enviar</div>'
+    +'<div class="t'+(n('factura_pendiente')?' bad':'')+'"><b>'+n('factura_pendiente')+'</b>Facturas por enviar'+(n('factura_pendiente')&&sumE('factura_pendiente')?'<div class="sub">'+eur(sumE('factura_pendiente'))+'</div>':'')+'</div>'
+    +'</div><div class="chips" id="ob-chips"></div></div>';
+  const chips=$('#ob-chips');
+  const addChip=(k,txt,cnt)=>{const b=document.createElement('button');b.type='button';b.className='chip'+(oFiltro===k?' on':'');b.innerHTML=esc(txt)+'<b>'+cnt+'</b>';b.onclick=()=>{oFiltro=k;drawObras()};chips.appendChild(b)};
+  addChip('','Todas',obras.length);ESTADOS.forEach(e=>addChip(e[0],e[1],n(e[0])));
   const el=$('#obrasList');
   if(!obras.length){el.innerHTML='<div class="empty">Todavía no hay obras. Crea la primera arriba.</div>';return}
+  const list=obras.filter(o=>!oFiltro||o.estado===oFiltro);
+  if(!list.length){el.innerHTML='<div class="empty">No hay obras con este estado.</div>';return}
   el.innerHTML='';
-  obras.forEach(o=>{
+  list.forEach(o=>{
     const horas=regs.filter(r=>r.obraId===o.id).reduce((a,r)=>a+(+r.horas||0),0);
-    const c=document.createElement('div');c.className='card row'+(o.activa?'':' closed');
+    const c=document.createElement('div');c.className='card'+(o.activa?'':' closed');
     const l1=[tipoES(o.tipo),o.cliente,o.nif?'NIF '+o.nif:'',o.desplazamiento?'Desplazamiento '+fmtH(+o.desplazamiento)+' h':''].filter(Boolean).map(esc).join(' · ');
     const l2=[o.ubicacion?'📍 '+o.ubicacion:'',o.direccion?'Dir. social: '+o.direccion:''].filter(Boolean).map(esc).join(' · ');
-    c.innerHTML='<div style="flex:1"><b>'+(o.codigo?'<span class="pill">'+esc(o.codigo)+'</span> ':'')+esc(o.nombre)+'</b>'+(l1?'<div class="sub">'+l1+'</div>':'')+(l2?'<div class="sub">'+l2+'</div>':'')+'<div class="sub">'+fmtH(horas)+' h registradas'+(o.activa?'':' · cerrada')+'</div></div>';
-    const col=document.createElement('div');col.className='pcol';
+    c.innerHTML='<div class="cl-top"><div><b>'+(o.codigo?'<span class="pill">'+esc(o.codigo)+'</span> ':'')+esc(o.nombre)+'</b>'+(l1?'<div class="sub">'+l1+'</div>':'')+(l2?'<div class="sub">'+l2+'</div>':'')+'<div class="sub">'+fmtH(horas)+' h registradas'+(o.activa?'':' · Cerrada')+'</div></div><div class="cl-imp">'+(o.importe?eur(o.importe):'')+'</div></div>'
+      +'<div style="margin-top:6px"><span class="st st-'+o.estado+'">'+esc(estLabel(o.estado))+'</span>'+(o.fechaEstado?' <span class="sub">desde '+fmtDate(o.fechaEstado)+'</span>':'')+'</div>';
+    const act=document.createElement('div');act.className='cl-actions';
+    const sel=document.createElement('select');sel.setAttribute('aria-label','Cambiar estado');
+    sel.innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'"'+(e[0]===o.estado?' selected':'')+'>'+e[1]+'</option>').join('');
+    sel.onchange=()=>api('PATCH','/api/obras/'+o.id,{estado:sel.value}).then(refresh).catch(()=>{sel.value=o.estado;notice('No se pudo cambiar el estado.','bad')});
     const e=document.createElement('button');e.className='btn sec';e.textContent='Editar';e.onclick=()=>startEdit(o);
     const b=document.createElement('button');b.className='btn sec';b.textContent=o.activa?'Cerrar':'Reabrir';
     b.onclick=()=>api('PATCH','/api/obras/'+o.id,{activa:!o.activa}).then(refresh).catch(()=>notice('No se pudo actualizar.','bad'));
     const x=document.createElement('button');x.className='btn del';x.textContent='Eliminar';x.onclick=()=>deleteObra(o);
-    col.append(e,b,x);c.appendChild(col);el.appendChild(c);
+    act.append(sel,e,b,x);c.appendChild(act);el.appendChild(c);
   });
 }
 
@@ -1264,77 +1289,53 @@ function syncSession(){
   }
 }
 
-/* ---------- clientes / CRM (admin) ---------- */
-const ESTADOS=[['presupuesto_pendiente','Presupuesto pendiente'],['presupuesto_enviado','Presupuesto enviado'],['aceptado','Aceptado'],['factura_pendiente','Factura pendiente'],['facturado','Facturado']];
-const estLabel=k=>(ESTADOS.find(e=>e[0]===k)||[0,k])[1];
-const eur=n=>(Math.round((n||0)*100)/100).toLocaleString('es-ES')+' €';
-let cFiltro='',cEdit=null;
-$('#cl-estado').innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'">'+e[1]+'</option>').join('');
+/* ---------- clientes (admin) ---------- */
+let cEdit=null;
 function clForm(show,c){
   cEdit=c?c.id:null;$('#cl-form').hidden=!show;
   if(!show)return;
   $('#cl-ftitle').textContent=c?'Editar cliente':'Nuevo cliente';
-  $('#cl-nombre').value=c?c.nombre:'';$('#cl-proyecto').value=c?c.proyecto:'';
-  $('#cl-importe').value=c&&c.importe?String(c.importe).replace('.',','):'';
-  $('#cl-estado').value=c?c.estado:'presupuesto_pendiente';
-  $('#cl-tel').value=c?c.telefono:'';$('#cl-email').value=c?c.email:'';$('#cl-contacto').value=c?c.contacto:'';
-  fillClObra();$('#cl-obra').value=c?c.obraId:'';$('#cl-notas').value=c?c.notas:'';
+  $('#cl-nombre').value=c?c.nombre:'';$('#cl-nif').value=c?c.nif:'';$('#cl-dir').value=c?c.direccion:'';
+  $('#cl-contacto').value=c?c.contacto:'';$('#cl-tel').value=c?c.telefono:'';$('#cl-email').value=c?c.email:'';$('#cl-notas').value=c?c.notas:'';
   $('#cl-form').scrollIntoView({behavior:'smooth',block:'start'});
 }
-function fillClObra(){
-  const sel=$('#cl-obra'),v=sel.value;
-  sel.innerHTML='<option value="">Sin obra</option>'+obras.map(o=>'<option value="'+esc(o.id)+'">'+esc((o.codigo?o.codigo+' · ':'')+o.nombre)+'</option>').join('');
-  sel.value=v;
-}
-$('#cl-nuevo').onclick=()=>clForm($('#cl-form').hidden||cEdit);
+$('#cl-nuevo').onclick=()=>clForm($('#cl-form').hidden||!!cEdit);
 $('#cl-cancelar').onclick=()=>clForm(false);
 $('#cl-guardar').onclick=async()=>{
   const nombre=$('#cl-nombre').value.trim();
   if(!nombre)return notice('Escribe el nombre del cliente.','bad');
-  const data={nombre,proyecto:$('#cl-proyecto').value,importe:$('#cl-importe').value,estado:$('#cl-estado').value,telefono:$('#cl-tel').value,email:$('#cl-email').value,contacto:$('#cl-contacto').value,obraId:$('#cl-obra').value,notas:$('#cl-notas').value};
+  const data={nombre,nif:$('#cl-nif').value.toUpperCase(),direccion:$('#cl-dir').value,contacto:$('#cl-contacto').value,telefono:$('#cl-tel').value,email:$('#cl-email').value,notas:$('#cl-notas').value};
+  const editing=!!cEdit;
   try{
-    if(cEdit)await api('PATCH','/api/clientes/'+cEdit,data);else await api('POST','/api/clientes',data);
-    await refresh();clForm(false);notice(cEdit?'Cliente actualizado ✔':'Cliente creado ✔','ok');
+    if(editing)await api('PATCH','/api/clientes/'+cEdit,data);else await api('POST','/api/clientes',data);
+    await refresh();clForm(false);notice(editing?'Cliente actualizado ✔':'Cliente creado ✔','ok');
   }catch(e){notice(e.status?e.message:'No se pudo guardar el cliente.','bad')}
 };
 function drawClientes(){
   const el=$('#cl-list');if(!el)return;
-  const n=k=>clientes.filter(c=>c.estado===k).length;
-  const sumPend=k=>clientes.filter(c=>c.estado===k).reduce((a,c)=>a+(c.importe||0),0);
-  $('#cl-resumen').innerHTML='<div class="card"><div class="todo">'
-    +'<div class="t'+(n('presupuesto_pendiente')?' warn':'')+'"><b>'+n('presupuesto_pendiente')+'</b>Presupuestos por enviar</div>'
-    +'<div class="t'+(n('factura_pendiente')?' bad':'')+'"><b>'+n('factura_pendiente')+'</b>Facturas por enviar'+(n('factura_pendiente')?'<div class="sub">'+eur(sumPend('factura_pendiente'))+'</div>':'')+'</div>'
-    +'</div><div class="chips" id="cl-chips"></div></div>';
-  const chips=$('#cl-chips');
-  const addChip=(k,txt,cnt)=>{const b=document.createElement('button');b.type='button';b.className='chip'+(cFiltro===k?' on':'');b.innerHTML=esc(txt)+'<b>'+cnt+'</b>';b.onclick=()=>{cFiltro=k;drawClientes()};chips.appendChild(b)};
-  addChip('','Todos',clientes.length);ESTADOS.forEach(e=>addChip(e[0],e[1],n(e[0])));
-  fillClObra();
-  const list=clientes.filter(c=>!cFiltro||c.estado===cFiltro).sort((a,b)=>(b.ts||0)-(a.ts||0));
-  if(!list.length){el.innerHTML='<div class="empty">'+(clientes.length?'No hay clientes con este estado.':'Todavía no hay clientes. Crea el primero con «+ Nuevo cliente».')+'</div>';return}
+  if(!clientes.length){el.innerHTML='<div class="empty">Todavía no hay clientes. Crea el primero con «+ Nuevo cliente».</div>';return}
   el.innerHTML='';
-  list.forEach(c=>{
-    const o=c.obraId&&obras.find(x=>x.id===c.obraId);
+  clientes.slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'')).forEach(c=>{
+    const os=obras.filter(o=>o.clienteId===c.id);
     const card=document.createElement('div');card.className='card';
     const lines=[];
     if(c.contacto)lines.push(esc(c.contacto));
     if(c.telefono)lines.push('<a href="tel:'+esc(c.telefono.replace(/[^+\d]/g,''))+'">'+esc(c.telefono)+'</a>');
     if(c.email)lines.push('<a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>');
-    card.innerHTML='<div class="cl-top"><div><b>'+esc(c.nombre)+'</b>'+(c.proyecto?'<div class="sub">'+esc(c.proyecto)+'</div>':'')+'</div><div class="cl-imp">'+(c.importe?eur(c.importe):'')+'</div></div>'
-      +'<div style="margin-top:6px"><span class="st st-'+c.estado+'">'+esc(estLabel(c.estado))+'</span>'+(c.fecha?' <span class="sub">desde '+fmtDate(c.fecha)+'</span>':'')+'</div>'
-      +(lines.length?'<div class="sub" style="margin-top:6px">'+lines.join(' · ')+'</div>':'')
-      +(o?'<div class="sub">Obra: '+esc((o.codigo?o.codigo+' · ':'')+o.nombre)+'</div>':'')
-      +(c.notas?'<div style="margin-top:6px;white-space:pre-wrap">'+esc(c.notas)+'</div>':'');
+    const pend=os.filter(o=>o.estado==='presupuesto_pendiente').length,fact=os.filter(o=>o.estado==='factura_pendiente').length;
+    card.innerHTML='<b>'+esc(c.nombre)+'</b>'+(c.nif?'<div class="sub">NIF '+esc(c.nif)+'</div>':'')+(c.direccion?'<div class="sub">'+esc(c.direccion)+'</div>':'')
+      +(lines.length?'<div class="sub" style="margin-top:4px">'+lines.join(' · ')+'</div>':'')
+      +(c.notas?'<div style="margin-top:6px;white-space:pre-wrap">'+esc(c.notas)+'</div>':'')
+      +'<div style="margin-top:8px"><div class="sub" style="margin-bottom:4px">'+os.length+' obra'+(os.length===1?'':'s')+(pend?' · '+pend+' presupuesto'+(pend===1?'':'s')+' por enviar':'')+(fact?' · '+fact+' factura'+(fact===1?'':'s')+' por enviar':'')+'</div>'
+      +os.map(o=>'<div class="cl-obra"><span>'+esc((o.codigo?o.codigo+' · ':'')+o.nombre)+'</span><span class="st st-'+o.estado+'">'+esc(estLabel(o.estado))+'</span></div>').join('')+'</div>';
     const act=document.createElement('div');act.className='cl-actions';
-    const sel=document.createElement('select');sel.setAttribute('aria-label','Cambiar estado');
-    sel.innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'"'+(e[0]===c.estado?' selected':'')+'>'+e[1]+'</option>').join('');
-    sel.onchange=()=>api('PATCH','/api/clientes/'+c.id,{estado:sel.value}).then(refresh).catch(()=>{sel.value=c.estado;notice('No se pudo cambiar el estado.','bad')});
     const ed=document.createElement('button');ed.className='btn sec';ed.textContent='Editar';ed.onclick=()=>clForm(true,c);
     const del=document.createElement('button');del.className='btn del';del.textContent='Eliminar';
     del.onclick=async()=>{
-      if(!await confirmDlg('¿Eliminar a «'+c.nombre+'»?','Se borra la ficha del cliente. No se puede deshacer.','Eliminar'))return;
+      if(!await confirmDlg('¿Eliminar a «'+c.nombre+'»?',os.length?'Sus '+os.length+' obra'+(os.length===1?'':'s')+' se conservan, pero quedarán sin cliente. No se puede deshacer.':'Se borra la ficha del cliente. No se puede deshacer.','Eliminar'))return;
       try{await api('DELETE','/api/clientes/'+c.id);await refresh();notice('Cliente eliminado ✔','ok')}catch(_){notice('No se pudo eliminar.','bad')}
     };
-    act.append(sel,ed,del);card.appendChild(act);el.appendChild(card);
+    act.append(ed,del);card.appendChild(act);el.appendChild(card);
   });
 }
 

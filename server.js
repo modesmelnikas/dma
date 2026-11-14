@@ -19,11 +19,12 @@ if (!mock && (!env.MONDAY_API_TOKEN || !B.obras || !B.personal || !B.registros |
 const mon = mock ? makeMock() : makeMonday(env.MONDAY_API_TOKEN);
 
 const COLS = {
-  obras: ['cliente', 'nif', 'direccion', 'ubicacion', 'tipo', 'desplazamiento', 'codigo', 'activa'],
+  obras: ['cliente', 'nif', 'direccion', 'ubicacion', 'tipo', 'desplazamiento', 'codigo', 'activa', 'clienteid', 'estado', 'importe', 'fechaestado'],
   personal: ['usuario', 'rol', 'salt', 'hash', 'mustchange', 'activo'],
-  clientes: ['proyecto', 'contacto', 'telefono', 'email', 'importe', 'estado', 'obraid', 'fecha', 'notas'],
+  clientes: ['nif', 'direccion', 'contacto', 'telefono', 'email', 'notas'],
   registros: ['obraid', 'obranombre', 'uid', 'nombreop', 'fecha', 'horas', 'entrada', 'salida', 'comida', 'trabajo'],
 };
+const today = () => new Date().toISOString().slice(0, 10);
 const FIRST_CODE = 260100;
 const TTL = 15000;
 
@@ -42,13 +43,17 @@ const bust = (k) => { cache[k] = null; };
 
 /* ---------- conversión a la forma que usa la web ---------- */
 const bool = (v) => v === '1';
-const obraOut = (r) => ({ id: r.id, nombre: r.nombre, cliente: r.cliente, nif: r.nif, direccion: r.direccion, ubicacion: r.ubicacion,
-  tipo: r.tipo, desplazamiento: Number(r.desplazamiento) || 0, codigo: r.codigo, activa: bool(r.activa), ts: r.ts });
 const persOut = (r) => ({ id: r.id, nombre: r.nombre, usuario: r.usuario, rol: r.rol === 'admin' ? 'admin' : 'operario',
   mustChange: bool(r.mustchange), activo: bool(r.activo), ts: r.ts });
 const ESTADOS = ['presupuesto_pendiente', 'presupuesto_enviado', 'aceptado', 'factura_pendiente', 'facturado'];
-const cliOut = (r) => ({ id: r.id, nombre: r.nombre, proyecto: r.proyecto, contacto: r.contacto, telefono: r.telefono, email: r.email,
-  importe: Number(r.importe) || 0, estado: ESTADOS.includes(r.estado) ? r.estado : 'presupuesto_pendiente', obraId: r.obraid, fecha: r.fecha, notas: r.notas, ts: r.ts });
+const obraOut = (r, cli, adm) => {
+  const o = { id: r.id, nombre: r.nombre, tipo: r.tipo, desplazamiento: Number(r.desplazamiento) || 0, codigo: r.codigo, activa: bool(r.activa), ts: r.ts };
+  if (!adm) return o;
+  const c = cli || null;
+  return Object.assign(o, { cliente: c ? c.nombre : r.cliente, nif: c ? c.nif : r.nif, direccion: c ? c.direccion : r.direccion, ubicacion: r.ubicacion,
+    clienteId: c ? c.id : '', estado: ESTADOS.includes(r.estado) ? r.estado : 'presupuesto_pendiente', importe: Number(r.importe) || 0, fechaEstado: r.fechaestado });
+};
+const cliOut = (r) => ({ id: r.id, nombre: r.nombre, nif: r.nif, direccion: r.direccion, contacto: r.contacto, telefono: r.telefono, email: r.email, notas: r.notas, ts: r.ts });
 const regOut = (r) => ({ id: r.id, obraId: r.obraid, obraNombre: r.obranombre, uid: r.uid, nombreOp: r.nombreop, fecha: r.fecha,
   horas: Number(r.horas) || 0, entrada: r.entrada, salida: r.salida, comida: r.comida !== '0', trabajo: r.trabajo, fotoIds: r.fotoIds || [], ts: r.ts });
 
@@ -136,7 +141,7 @@ app.get('/api/data', auth, active, wrap(async (req, res) => {
   const [obras, personal, regs, clis] = await Promise.all([load('obras'), load('personal'), load('registros'), adm ? load('clientes') : []]);
   const reg = (adm ? regs : regs.filter((r) => r.uid === req.user.id)).map(regOut).sort((a, b) => b.ts - a.ts).slice(0, 3000);
   res.json({
-    obras: obras.map(obraOut),
+    obras: obras.map((o) => obraOut(o, clis.find((c) => c.id === o.clienteid), adm)),
     registros: reg,
     personal: (adm ? personal : personal.filter((p) => p.id === req.user.id)).map(persOut),
     clientes: clis.map(cliOut),
@@ -144,13 +149,25 @@ app.get('/api/data', auth, active, wrap(async (req, res) => {
 }));
 
 /* ----- obras ----- */
-function obraVals(b) {
-  const t = (v) => String(v == null ? '' : v).trim().slice(0, 200);
-  const d = Math.max(0, Math.min(24, Number(b.desplazamiento) || 0));
-  return { name: t(b.nombre), vals: { cliente: t(b.cliente), nif: t(b.nif), direccion: t(b.direccion), ubicacion: t(b.ubicacion), tipo: t(b.tipo), desplazamiento: String(d) } };
+async function obraVals(b, partial) {
+  const t = (v) => String(v == null ? '' : v).trim().slice(0, 200), vals = {};
+  const out = { name: null, vals };
+  if (!partial || 'nombre' in b) out.name = t(b.nombre);
+  for (const k of ['ubicacion', 'tipo']) if (!partial || k in b) vals[k] = t(b[k]);
+  if (!partial || 'desplazamiento' in b) vals.desplazamiento = String(Math.max(0, Math.min(24, Number(b.desplazamiento) || 0)));
+  if (!partial || 'importe' in b) vals.importe = String(Math.max(0, Number(String(b.importe == null ? 0 : b.importe).replace(',', '.')) || 0));
+  if (!partial || 'clienteId' in b) {
+    const c = b.clienteId ? (await load('clientes')).find((x) => x.id === String(b.clienteId)) : null;
+    vals.clienteid = c ? c.id : ''; vals.cliente = c ? c.nombre : '';
+  }
+  if ('estado' in b || !partial) {
+    const e = ESTADOS.includes(b.estado) ? b.estado : 'presupuesto_pendiente';
+    vals.estado = e; vals.fechaestado = today();
+  }
+  return out;
 }
 app.post('/api/obras', auth, active, admin, wrap(async (req, res) => {
-  const { name, vals } = obraVals(req.body);
+  const { name, vals } = await obraVals(req.body, false);
   if (!name) return res.status(400).json({ error: 'Falta el nombre de la obra.' });
   const obras = await load('obras');
   const max = obras.reduce((m, o) => Math.max(m, parseInt(o.codigo, 10) || 0), FIRST_CODE - 1);
@@ -158,9 +175,11 @@ app.post('/api/obras', auth, active, admin, wrap(async (req, res) => {
   bust('obras'); res.json({ id: r.id });
 }));
 app.patch('/api/obras/:id', auth, active, admin, wrap(async (req, res) => {
-  const b = req.body, vals = {}; let name = null;
+  const b = req.body;
+  const { name, vals } = await obraVals(b, true);
   if ('activa' in b) vals.activa = b.activa ? '1' : '0';
-  if ('nombre' in b) { const o = obraVals(b); if (!o.name) return res.status(400).json({ error: 'Falta el nombre.' }); name = o.name; Object.assign(vals, o.vals); }
+  if ('estado' in b && !ESTADOS.includes(b.estado)) return res.status(400).json({ error: 'Estado no válido.' });
+  if (name === '') return res.status(400).json({ error: 'Falta el nombre.' });
   await mon.update(B.obras, req.params.id, vals, name);
   bust('obras'); res.json({ ok: true });
 }));
@@ -210,34 +229,28 @@ app.get('/api/fotos/:id', auth, active, wrap(async (req, res) => {
 }));
 
 /* ----- clientes / CRM (admin) ----- */
-const today = () => new Date().toISOString().slice(0, 10);
 function cliVals(b, partial) {
   const t = (v, n = 200) => String(v == null ? '' : v).trim().slice(0, n), vals = {};
-  for (const k of ['proyecto', 'contacto', 'telefono', 'email']) if (!partial || k in b) vals[k] = t(b[k]);
-  if (!partial || 'importe' in b) vals.importe = String(Math.max(0, Number(String(b.importe).replace(',', '.')) || 0));
-  if (!partial || 'obraId' in b) vals.obraid = t(b.obraId, 40);
+  for (const k of ['nif', 'direccion', 'contacto', 'telefono', 'email']) if (!partial || k in b) vals[k] = t(b[k]);
   if (!partial || 'notas' in b) vals.notas = { text: t(b.notas, 3000) };
   return vals;
 }
 app.post('/api/clientes', auth, active, admin, wrap(async (req, res) => {
   const nombre = String(req.body.nombre || '').trim().slice(0, 150);
   if (!nombre) return res.status(400).json({ error: 'Falta el nombre del cliente.' });
-  const estado = ESTADOS.includes(req.body.estado) ? req.body.estado : 'presupuesto_pendiente';
-  const r = await mon.create(B.clientes, nombre, { ...cliVals(req.body, false), estado, fecha: today() });
+  const r = await mon.create(B.clientes, nombre, cliVals(req.body, false));
   bust('clientes'); res.json({ id: r.id });
 }));
 app.patch('/api/clientes/:id', auth, active, admin, wrap(async (req, res) => {
   const b = req.body, vals = cliVals(b, true); let name = null;
   if ('nombre' in b) { name = String(b.nombre || '').trim().slice(0, 150); if (!name) return res.status(400).json({ error: 'Falta el nombre.' }); }
-  if ('estado' in b) {
-    if (!ESTADOS.includes(b.estado)) return res.status(400).json({ error: 'Estado no válido.' });
-    vals.estado = b.estado; vals.fecha = today();
-  }
   await mon.update(B.clientes, req.params.id, vals, name);
-  bust('clientes'); res.json({ ok: true });
+  if (name) for (const o of (await load('obras')).filter((x) => x.clienteid === req.params.id)) await mon.update(B.obras, o.id, { cliente: name });
+  bust('clientes'); bust('obras'); res.json({ ok: true });
 }));
 app.delete('/api/clientes/:id', auth, active, admin, wrap(async (req, res) => {
-  await mon.remove(req.params.id); bust('clientes'); res.json({ ok: true });
+  for (const o of (await load('obras')).filter((x) => x.clienteid === req.params.id)) await mon.update(B.obras, o.id, { clienteid: '' });
+  await mon.remove(req.params.id); bust('clientes'); bust('obras'); res.json({ ok: true });
 }));
 
 /* ----- personal (admin) ----- */

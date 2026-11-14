@@ -72,15 +72,28 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
   await a('PATCH', '/api/personal/' + mid, { password: 'reset123' });
   const m2 = client(); assert.equal((await m2('POST', '/api/login', { usuario: 'marc', password: 'marc1234' })).s, 401);
   await m2('POST', '/api/login', { usuario: 'marc', password: 'reset123' }); assert.equal((await m2('GET', '/api/me')).j.mustChange, true);
-  // CRM
-  const c1 = (await a('POST', '/api/clientes', { nombre: 'Cliente Pere', proyecto: 'Porxo', importe: '12500,50', notas: 'Llamar' })).j.id;
-  let cl = (await a('GET', '/api/data')).j.clientes; assert.equal(cl.length, 1);
-  assert.equal(cl[0].estado, 'presupuesto_pendiente'); assert.equal(cl[0].importe, 12500.5); assert.equal(cl[0].notas, 'Llamar');
-  assert.equal((await a('PATCH', '/api/clientes/' + c1, { estado: 'inventado' })).s, 400);
-  assert.equal((await a('PATCH', '/api/clientes/' + c1, { estado: 'presupuesto_enviado' })).s, 200);
-  cl = (await a('GET', '/api/data')).j.clientes; assert.equal(cl[0].estado, 'presupuesto_enviado'); assert.equal(cl[0].proyecto, 'Porxo');
+  // CRM: clientes con varias obras y estado por obra
+  const c1 = (await a('POST', '/api/clientes', { nombre: 'Fustes Graus', nif: 'b123', telefono: '600', notas: 'Habitual' })).j.id;
+  let dd = (await a('GET', '/api/data')).j; assert.equal(dd.clientes.length, 1); assert.equal(dd.clientes[0].notas, 'Habitual');
+  const oa = (await a('POST', '/api/obras', { nombre: 'Porxo 1', clienteId: c1, importe: '1250,5' })).j.id;
+  const ob = (await a('POST', '/api/obras', { nombre: 'Porxo 2', clienteId: c1, estado: 'aceptado' })).j.id;
+  dd = (await a('GET', '/api/data')).j;
+  const xa = dd.obras.find((o) => o.id === oa), xb = dd.obras.find((o) => o.id === ob);
+  assert.equal(xa.cliente, 'Fustes Graus'); assert.equal(xa.nif, 'b123'); assert.equal(xa.clienteId, c1);
+  assert.equal(xa.estado, 'presupuesto_pendiente'); assert.equal(xa.importe, 1250.5); assert.equal(xb.estado, 'aceptado');
+  assert.equal((await a('PATCH', '/api/obras/' + oa, { estado: 'inventado' })).s, 400);
+  assert.equal((await a('PATCH', '/api/obras/' + oa, { estado: 'presupuesto_enviado' })).s, 200);
+  assert.equal((await a('GET', '/api/data')).j.obras.find((o) => o.id === oa).estado, 'presupuesto_enviado');
+  await a('PATCH', '/api/clientes/' + c1, { nombre: 'Fustes Graus SL' });
+  assert.equal((await a('GET', '/api/data')).j.obras.find((o) => o.id === ob).cliente, 'Fustes Graus SL');
+  // operario no ve datos de cliente ni estados
+  const m3 = client(); await m3('POST', '/api/login', { usuario: 'marc', password: 'reset123' }); await m3('POST', '/api/password', { nueva: 'marc5678' });
+  const od = (await m3('GET', '/api/data')).j; assert.equal(od.clientes.length, 0);
+  assert.ok(od.obras.length >= 1 && od.obras.every((o) => !('cliente' in o) && !('estado' in o) && !('nif' in o)));
+  assert.equal((await m3('POST', '/api/clientes', { nombre: 'X' })).s, 403);
+  assert.equal((await m3('PATCH', '/api/obras/' + oa, { estado: 'facturado' })).s, 403);
   assert.equal((await a('DELETE', '/api/clientes/' + c1)).s, 200);
-  assert.equal((await a('GET', '/api/data')).j.clientes.length, 0);
+  dd = (await a('GET', '/api/data')).j; assert.equal(dd.clientes.length, 0); assert.equal(dd.obras.find((o) => o.id === oa).clienteId, '');
   assert.equal((await a('GET', '/')).s, 200);
   console.log('TODO OK'); srv.close();
 })().catch((e) => { console.error('FALLO', e); process.exit(1); });
