@@ -1,7 +1,7 @@
 # DMA – Registro de obras y horas
 
 Web app para que los operarios de DMA Estructures i Cobertes S.L. registren sus horas por obra, con panel de administración.
-Node/Express + **Monday** como base de datos (tableros *DMA - Obras*, *DMA - Personal*, *DMA - Registros*).
+Node/Express + **Monday** como base de datos (tableros *DMA - Obras*, *DMA - Personal*, *DMA - Registros*, *DMA - Clientes*).
 
 ## Variables de entorno (Render → Environment)
 | Variable | Valor |
@@ -10,6 +10,7 @@ Node/Express + **Monday** como base de datos (tableros *DMA - Obras*, *DMA - Per
 | `BOARD_OBRAS` | 5107838007 |
 | `BOARD_PERSONAL` | 5107838012 |
 | `BOARD_REGISTROS` | 5107838013 |
+| `BOARD_CLIENTES` | 5107839069 |
 | `SESSION_SECRET` | cadena aleatoria larga |
 | `INITIAL_ADMIN_USER` / `INITIAL_ADMIN_PASSWORD` / `INITIAL_ADMIN_NAME` | primer administrador (se crea solo si el tablero Personal está vacío; pide cambiar la contraseña al entrar) |
 

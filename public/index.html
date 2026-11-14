@@ -134,6 +134,27 @@ body.locked #login,body.locked #cambio{width:100%;max-width:400px;margin:0;paddi
 
 input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-height:38px;display:block}
 .grid2>*{min-width:0}
+/* ---- CRM ---- */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.chip{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600}
+.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.chip b{opacity:.75;margin-left:4px}
+.todo{display:flex;gap:8px;flex-wrap:wrap}
+.todo .t{flex:1;min-width:140px;border-radius:10px;padding:10px 12px;border:1px solid var(--line);background:#fff}
+.todo .t b{display:block;font-size:22px;line-height:1.1}
+.todo .t.warn{background:#fff7e6;border-color:#f3d9a0}
+.todo .t.bad{background:#fdecec;border-color:#f3c0c0}
+.st{display:inline-block;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;white-space:nowrap}
+.st-presupuesto_pendiente{background:#fdeccb;color:#8a5a00}
+.st-presupuesto_enviado{background:#e3ecf7;color:#1f4f82}
+.st-aceptado{background:#dcefdc;color:#1d5c2c}
+.st-factura_pendiente{background:#f8d9d9;color:#9b1c1c}
+.st-facturado{background:#e8e2d6;color:#5a4a33}
+.cl-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.cl-imp{font-weight:700;white-space:nowrap}
+.cl-actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.cl-actions select{width:100%;flex:1 1 100%;padding:8px}
+.cl-actions .btn{flex:1;padding:8px 12px;font-size:13px;text-align:center}
 /* ---- barra inferior (móvil / app) ---- */
 #bnav{display:none}
 @media (max-width:900px){
@@ -162,6 +183,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
     <button data-t="mis">Mis registros</button>
     <button data-t="panel" class="adm" hidden>Panel</button>
     <button data-t="obras" class="adm" hidden>Obras</button>
+    <button data-t="clientes" class="adm" hidden>Clientes</button>
     <button data-t="personal" class="adm" hidden>Personal</button>
   </nav>
   <div class="hright">
@@ -303,6 +325,33 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
     </div>
     <button class="btn sec" id="pf-salir" type="button" style="width:100%;padding:10px">Salir</button>
   </section>
+  <section id="s-clientes">
+    <div id="cl-resumen"></div>
+    <div class="row" style="margin-bottom:10px"><button class="btn" id="cl-nuevo" type="button">+ Nuevo cliente</button></div>
+    <div class="card" id="cl-form" hidden>
+      <b id="cl-ftitle">Nuevo cliente</b>
+      <label for="cl-nombre">Cliente</label>
+      <input id="cl-nombre" autocomplete="off">
+      <label for="cl-proyecto">Proyecto / trabajo</label>
+      <input id="cl-proyecto" autocomplete="off" placeholder="p. ej. Porxo de fusta">
+      <div class="grid2">
+        <div><label for="cl-importe">Importe (€)</label><input id="cl-importe" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+        <div><label for="cl-estado">Estado</label><select id="cl-estado"></select></div>
+      </div>
+      <div class="grid2">
+        <div><label for="cl-tel">Teléfono</label><input id="cl-tel" type="tel" autocomplete="off"></div>
+        <div><label for="cl-email">Email</label><input id="cl-email" type="email" autocapitalize="none" autocomplete="off"></div>
+      </div>
+      <label for="cl-contacto">Persona de contacto</label>
+      <input id="cl-contacto" autocomplete="off">
+      <label for="cl-obra">Obra relacionada (opcional)</label>
+      <select id="cl-obra"></select>
+      <label for="cl-notas">Notas</label>
+      <textarea id="cl-notas" rows="3"></textarea>
+      <div class="row" style="margin-top:14px"><button class="btn" id="cl-guardar" type="button" style="flex:1">Guardar</button><button class="btn sec" id="cl-cancelar" type="button">Cancelar</button></div>
+    </div>
+    <div id="cl-list"></div>
+  </section>
   <section id="s-personal">
     <div id="p-msg"></div>
     <div class="card">
@@ -338,7 +387,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let me=null,isAdmin=false,canWrite=true;
-let obras=[],regs=[],names={},pending=[],tab='nuevo',saving=false;
+let clientes=[],obras=[],regs=[],names={},pending=[],tab='nuevo',saving=false;
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const fmtDate=s=>{const p=(s||'').split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s};
 const fmtH=n=>(Math.round(n*100)/100).toString().replace('.',',');
@@ -353,7 +402,7 @@ async function api(method,url,body){
 async function refresh(){
   const d=await api('GET','/api/data');
   obras=d.obras.sort((a,b)=>(b.ts||0)-(a.ts||0)||String(b.codigo||'').localeCompare(String(a.codigo||'')));
-  regs=d.registros;personal=d.personal.sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
+  regs=d.registros;clientes=d.clientes||[];personal=d.personal.sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
   snapNames={};regs.forEach(r=>{if(r.nombreOp)snapNames[r.uid]=r.nombreOp});
   calc=computeHoras(regs);
   syncSession();
@@ -1078,7 +1127,7 @@ $('#dlBtn').onclick=e=>{e.stopPropagation();$('#dlMenu').hidden=!$('#dlMenu').hi
 $('#dlMenu').addEventListener('click',()=>{$('#dlMenu').hidden=true});
 document.addEventListener('click',()=>{$('#dlMenu').hidden=true});
 
-function redraw(){drawSelects();drawMis();drawPanel();if(isAdmin){drawObras();drawPersonal()}}
+function redraw(){drawSelects();drawMis();drawPanel();if(isAdmin){drawObras();drawClientes();drawPersonal()}}
 
 /* ---------- contraseñas ---------- */
 function genPw(){
@@ -1109,10 +1158,11 @@ const TABICON={
   nuevo:SV('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8.5v7M8.5 12h7"/>'),
   mis:SV('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M8 3v4M16 3v4M4 10h16"/>'),
   panel:SV('<path d="M5 20V11M12 20V5M19 20v-6"/>'),
+  clientes:SV('<rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/>'),
   obras:SV('<path d="M3.5 11.5 12 4l8.5 7.5"/><path d="M6 10.5V20h12v-9.5M10 20v-5h4v5"/>'),
   personal:SV('<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17 14.8c2.2.5 3.5 2.3 3.5 4.7"/>')
 };
-const TABSHORT={nuevo:'Nuevo',mis:'Registros',panel:'Panel',obras:'Obras',personal:'Personal'};
+const TABSHORT={nuevo:'Nuevo',mis:'Registros',panel:'Panel',obras:'Obras',clientes:'Clientes',personal:'Personal'};
 function buildBnav(){
   const bar=$('#bnav');if(!bar)return;bar.innerHTML='';
   document.querySelectorAll('#nav button').forEach(nb=>{
@@ -1173,7 +1223,7 @@ function enterApp(){
 function logout(msg){
   const was=sess;
   sess=null;me=null;isAdmin=false;dataStarted=false;clearInterval(pollT);
-  obras=[];regs=[];personal=[];
+  obras=[];regs=[];personal=[];clientes=[];
   if(was)api('POST','/api/logout').catch(()=>{});
   $('#l-user').value='';
   showLogin();
@@ -1210,8 +1260,82 @@ function syncSession(){
     document.querySelectorAll('.adm').forEach(b=>b.hidden=!isAdmin);
     tabLabels();
     setWho();
-    if(!isAdmin&&['panel','obras','personal'].includes(tab))setTab('nuevo');
+    if(!isAdmin&&['panel','obras','clientes','personal'].includes(tab))setTab('nuevo');
   }
+}
+
+/* ---------- clientes / CRM (admin) ---------- */
+const ESTADOS=[['presupuesto_pendiente','Presupuesto pendiente'],['presupuesto_enviado','Presupuesto enviado'],['aceptado','Aceptado'],['factura_pendiente','Factura pendiente'],['facturado','Facturado']];
+const estLabel=k=>(ESTADOS.find(e=>e[0]===k)||[0,k])[1];
+const eur=n=>(Math.round((n||0)*100)/100).toLocaleString('es-ES')+' €';
+let cFiltro='',cEdit=null;
+$('#cl-estado').innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'">'+e[1]+'</option>').join('');
+function clForm(show,c){
+  cEdit=c?c.id:null;$('#cl-form').hidden=!show;
+  if(!show)return;
+  $('#cl-ftitle').textContent=c?'Editar cliente':'Nuevo cliente';
+  $('#cl-nombre').value=c?c.nombre:'';$('#cl-proyecto').value=c?c.proyecto:'';
+  $('#cl-importe').value=c&&c.importe?String(c.importe).replace('.',','):'';
+  $('#cl-estado').value=c?c.estado:'presupuesto_pendiente';
+  $('#cl-tel').value=c?c.telefono:'';$('#cl-email').value=c?c.email:'';$('#cl-contacto').value=c?c.contacto:'';
+  fillClObra();$('#cl-obra').value=c?c.obraId:'';$('#cl-notas').value=c?c.notas:'';
+  $('#cl-form').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function fillClObra(){
+  const sel=$('#cl-obra'),v=sel.value;
+  sel.innerHTML='<option value="">Sin obra</option>'+obras.map(o=>'<option value="'+esc(o.id)+'">'+esc((o.codigo?o.codigo+' · ':'')+o.nombre)+'</option>').join('');
+  sel.value=v;
+}
+$('#cl-nuevo').onclick=()=>clForm($('#cl-form').hidden||cEdit);
+$('#cl-cancelar').onclick=()=>clForm(false);
+$('#cl-guardar').onclick=async()=>{
+  const nombre=$('#cl-nombre').value.trim();
+  if(!nombre)return notice('Escribe el nombre del cliente.','bad');
+  const data={nombre,proyecto:$('#cl-proyecto').value,importe:$('#cl-importe').value,estado:$('#cl-estado').value,telefono:$('#cl-tel').value,email:$('#cl-email').value,contacto:$('#cl-contacto').value,obraId:$('#cl-obra').value,notas:$('#cl-notas').value};
+  try{
+    if(cEdit)await api('PATCH','/api/clientes/'+cEdit,data);else await api('POST','/api/clientes',data);
+    await refresh();clForm(false);notice(cEdit?'Cliente actualizado ✔':'Cliente creado ✔','ok');
+  }catch(e){notice(e.status?e.message:'No se pudo guardar el cliente.','bad')}
+};
+function drawClientes(){
+  const el=$('#cl-list');if(!el)return;
+  const n=k=>clientes.filter(c=>c.estado===k).length;
+  const sumPend=k=>clientes.filter(c=>c.estado===k).reduce((a,c)=>a+(c.importe||0),0);
+  $('#cl-resumen').innerHTML='<div class="card"><div class="todo">'
+    +'<div class="t'+(n('presupuesto_pendiente')?' warn':'')+'"><b>'+n('presupuesto_pendiente')+'</b>Presupuestos por enviar</div>'
+    +'<div class="t'+(n('factura_pendiente')?' bad':'')+'"><b>'+n('factura_pendiente')+'</b>Facturas por enviar'+(n('factura_pendiente')?'<div class="sub">'+eur(sumPend('factura_pendiente'))+'</div>':'')+'</div>'
+    +'</div><div class="chips" id="cl-chips"></div></div>';
+  const chips=$('#cl-chips');
+  const addChip=(k,txt,cnt)=>{const b=document.createElement('button');b.type='button';b.className='chip'+(cFiltro===k?' on':'');b.innerHTML=esc(txt)+'<b>'+cnt+'</b>';b.onclick=()=>{cFiltro=k;drawClientes()};chips.appendChild(b)};
+  addChip('','Todos',clientes.length);ESTADOS.forEach(e=>addChip(e[0],e[1],n(e[0])));
+  fillClObra();
+  const list=clientes.filter(c=>!cFiltro||c.estado===cFiltro).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(!list.length){el.innerHTML='<div class="empty">'+(clientes.length?'No hay clientes con este estado.':'Todavía no hay clientes. Crea el primero con «+ Nuevo cliente».')+'</div>';return}
+  el.innerHTML='';
+  list.forEach(c=>{
+    const o=c.obraId&&obras.find(x=>x.id===c.obraId);
+    const card=document.createElement('div');card.className='card';
+    const lines=[];
+    if(c.contacto)lines.push(esc(c.contacto));
+    if(c.telefono)lines.push('<a href="tel:'+esc(c.telefono.replace(/[^+\d]/g,''))+'">'+esc(c.telefono)+'</a>');
+    if(c.email)lines.push('<a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>');
+    card.innerHTML='<div class="cl-top"><div><b>'+esc(c.nombre)+'</b>'+(c.proyecto?'<div class="sub">'+esc(c.proyecto)+'</div>':'')+'</div><div class="cl-imp">'+(c.importe?eur(c.importe):'')+'</div></div>'
+      +'<div style="margin-top:6px"><span class="st st-'+c.estado+'">'+esc(estLabel(c.estado))+'</span>'+(c.fecha?' <span class="sub">desde '+fmtDate(c.fecha)+'</span>':'')+'</div>'
+      +(lines.length?'<div class="sub" style="margin-top:6px">'+lines.join(' · ')+'</div>':'')
+      +(o?'<div class="sub">Obra: '+esc((o.codigo?o.codigo+' · ':'')+o.nombre)+'</div>':'')
+      +(c.notas?'<div style="margin-top:6px;white-space:pre-wrap">'+esc(c.notas)+'</div>':'');
+    const act=document.createElement('div');act.className='cl-actions';
+    const sel=document.createElement('select');sel.setAttribute('aria-label','Cambiar estado');
+    sel.innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'"'+(e[0]===c.estado?' selected':'')+'>'+e[1]+'</option>').join('');
+    sel.onchange=()=>api('PATCH','/api/clientes/'+c.id,{estado:sel.value}).then(refresh).catch(()=>{sel.value=c.estado;notice('No se pudo cambiar el estado.','bad')});
+    const ed=document.createElement('button');ed.className='btn sec';ed.textContent='Editar';ed.onclick=()=>clForm(true,c);
+    const del=document.createElement('button');del.className='btn del';del.textContent='Eliminar';
+    del.onclick=async()=>{
+      if(!await confirmDlg('¿Eliminar a «'+c.nombre+'»?','Se borra la ficha del cliente. No se puede deshacer.','Eliminar'))return;
+      try{await api('DELETE','/api/clientes/'+c.id);await refresh();notice('Cliente eliminado ✔','ok')}catch(_){notice('No se pudo eliminar.','bad')}
+    };
+    act.append(sel,ed,del);card.appendChild(act);el.appendChild(card);
+  });
 }
 
 /* ---------- personal (admin) ---------- */

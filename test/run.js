@@ -72,6 +72,15 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
   await a('PATCH', '/api/personal/' + mid, { password: 'reset123' });
   const m2 = client(); assert.equal((await m2('POST', '/api/login', { usuario: 'marc', password: 'marc1234' })).s, 401);
   await m2('POST', '/api/login', { usuario: 'marc', password: 'reset123' }); assert.equal((await m2('GET', '/api/me')).j.mustChange, true);
+  // CRM
+  const c1 = (await a('POST', '/api/clientes', { nombre: 'Cliente Pere', proyecto: 'Porxo', importe: '12500,50', notas: 'Llamar' })).j.id;
+  let cl = (await a('GET', '/api/data')).j.clientes; assert.equal(cl.length, 1);
+  assert.equal(cl[0].estado, 'presupuesto_pendiente'); assert.equal(cl[0].importe, 12500.5); assert.equal(cl[0].notas, 'Llamar');
+  assert.equal((await a('PATCH', '/api/clientes/' + c1, { estado: 'inventado' })).s, 400);
+  assert.equal((await a('PATCH', '/api/clientes/' + c1, { estado: 'presupuesto_enviado' })).s, 200);
+  cl = (await a('GET', '/api/data')).j.clientes; assert.equal(cl[0].estado, 'presupuesto_enviado'); assert.equal(cl[0].proyecto, 'Porxo');
+  assert.equal((await a('DELETE', '/api/clientes/' + c1)).s, 200);
+  assert.equal((await a('GET', '/api/data')).j.clientes.length, 0);
   assert.equal((await a('GET', '/')).s, 200);
   console.log('TODO OK'); srv.close();
 })().catch((e) => { console.error('FALLO', e); process.exit(1); });
