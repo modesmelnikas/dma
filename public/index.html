@@ -202,8 +202,8 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
       <label for="f-fecha">Fecha</label>
       <input type="date" id="f-fecha">
       <div class="grid2">
-        <div><label for="f-ent">Hora de entrada</label><input type="time" id="f-ent"></div>
-        <div><label for="f-sal">Hora de salida</label><input type="time" id="f-sal"></div>
+        <div><label for="f-ent">Hora de entrada</label><input type="time" id="f-ent" value="07:00"></div>
+        <div><label for="f-sal">Hora de salida</label><input type="time" id="f-sal" value="17:00"></div>
       </div>
       <label class="chkrow"><input type="checkbox" id="f-comida" checked><span>Comida (dinar)</span><b id="f-comida-v" style="margin-left:auto">Sí</b></label>
       <div class="sub" style="margin-top:6px">Viene marcado por defecto: «Sí» hay comida. Desmárcalo si no has parado a comer.</div>
@@ -474,7 +474,7 @@ $('#guardar').onclick=async()=>{
   try{
     await api('POST','/api/registros',{obraId,fecha,horas,entrada,salida,comida,trabajo,fotos:pending});
     await refresh();
-    $('#f-ent').value='';$('#f-sal').value='';$('#f-comida').checked=true;$('#f-comida-v').textContent='Sí';$('#f-calc').textContent='';$('#f-trabajo').value='';pending=[];drawThumbs();
+    $('#f-ent').value='07:00';$('#f-sal').value='17:00';$('#f-comida').checked=true;$('#f-comida-v').textContent='Sí';$('#f-trabajo').value='';pending=[];drawThumbs();showCalc();
     notice('Registro guardado ✔','ok');
   }catch(e){
     notice(e&&e.status?e.message:'No se pudo guardar. Revisa la conexión y vuelve a intentarlo.','bad');
@@ -1166,6 +1166,7 @@ function enterApp(){
   $('#perfilBtn').textContent='👤 '+sess.nombre;
   setWho();
   setTab('nuevo');
+  showCalc();
   startData();
   redraw();
 }
