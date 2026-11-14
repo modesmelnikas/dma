@@ -106,6 +106,13 @@ input[type=checkbox]{width:18px;height:18px;margin:0;padding:0;accent-color:var(
 .cal-g button:hover{background:var(--beige-l)}
 .cal-g button.today{background:var(--beige);font-weight:700}
 .cal-g button.sel{outline:2px solid var(--acc);outline-offset:-2px}
+.cal-g button.fest{background:#e3e0dc;color:#7a7268}
+.cal-g button.vpe{background:#fbd9a8;color:#7a4300;font-weight:700}
+.cal-g button.vap{background:#bcd7f7;color:#0f3f7a;font-weight:700}
+.cal-g button.wk{color:#b3a898}
+.cal-g button.fest.sel,.cal-g button.vpe.sel,.cal-g button.vap.sel{outline:2px solid var(--acc)}
+.cal-leg{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--mut)}
+.cal-leg span::before{content:"";display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:var(--c)}
 .cal-g button i{display:block;height:4px;border-radius:2px;background:#16a34a;margin:3px 8px 0}
 .car{color:var(--mut);display:inline-block;width:1em}
 .overlay{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
@@ -389,6 +396,7 @@ details.card[open]>summary::before{content:"▾ "}
       <div class="todo" id="v-saldo" style="margin-top:12px"></div>
     </div>
     <div id="v-pend"></div>
+    <div class="card" id="v-cal"></div>
     <div class="card">
       <b>Pedir vacaciones</b>
       <div class="sub" style="margin-top:4px">Solo cuentan los días laborables: no se descuentan fines de semana ni festivos.</div>
@@ -1482,8 +1490,60 @@ async function delVac(v,adm){
   if(!await confirmDlg(adm?'¿Eliminar la solicitud de '+v.nombre+'?':'¿Cancelar tu solicitud?',rango(v.desde,v.hasta)+' ('+v.dias+' día'+(v.dias===1?'':'s')+').',adm?'Eliminar':'Cancelar solicitud'))return;
   try{await api('DELETE','/api/vacaciones/'+v.id);await refresh();notice(adm?'Solicitud eliminada ✔':'Solicitud cancelada ✔','ok')}catch(_){notice('No se pudo cancelar.','bad')}
 }
+let vCalMes=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),vSel='';
+function drawVacCal(){
+  const el=$('#v-cal');el.innerHTML='';
+  const pad=n=>String(n).padStart(2,'0');
+  const y=+vCalMes.slice(0,4),m=+vCalMes.slice(5,7)-1;
+  const fmap={};festivos.forEach(f=>fmap[f.fecha]=f);
+  const day={};
+  vacs.forEach(v=>{
+    if(v.estado==='rechazada')return;
+    const end=Date.parse(v.hasta+'T00:00:00Z');
+    for(let t=Date.parse(v.desde+'T00:00:00Z');t<=end;t+=86400000){
+      const d=new Date(t),w=d.getUTCDay(),iso=d.toISOString().slice(0,10);
+      if(w===0||w===6||fmap[iso])continue;
+      (day[iso]=day[iso]||[]).push(v);
+    }
+  });
+  const head=document.createElement('div');head.className='cal-h';
+  const mk=(t,fn)=>{const b=document.createElement('button');b.className='btn sec';b.textContent=t;b.onclick=fn;return b};
+  const title=document.createElement('span');title.textContent=MESES[m]+' '+y;
+  const shift=n=>{const d=new Date(y,m+n,1);vCalMes=d.getFullYear()+'-'+pad(d.getMonth()+1);vSel='';drawVacCal()};
+  head.append(mk('‹',()=>shift(-1)),title,mk('›',()=>shift(1)));
+  el.appendChild(head);
+  const g=document.createElement('div');g.className='cal-g';
+  ['L','M','X','J','V','S','D'].forEach(w=>{const d=document.createElement('div');d.className='dw';d.textContent=w;g.appendChild(d)});
+  const off=(new Date(y,m,1).getDay()+6)%7,nd=new Date(y,m+1,0).getDate();
+  for(let i=0;i<off;i++)g.appendChild(document.createElement('div'));
+  for(let d=1;d<=nd;d++){
+    const k=vCalMes+'-'+pad(d),wd=(off+d-1)%7;
+    const b=document.createElement('button');b.type='button';
+    const cls=[];
+    if(fmap[k])cls.push('fest');
+    else if(day[k])cls.push(day[k].some(v=>v.estado==='aprobada')?'vap':'vpe');
+    else if(wd>=5)cls.push('wk');
+    if(k===today())cls.push('today');if(k===vSel)cls.push('sel');
+    b.className=cls.join(' ');b.textContent=d;
+    b.onclick=()=>{vSel=vSel===k?'':k;drawVacCal()};
+    g.appendChild(b);
+  }
+  el.appendChild(g);
+  const leg=document.createElement('div');leg.className='cal-leg';
+  leg.innerHTML='<span style="--c:#e3e0dc">Festivo</span><span style="--c:#fbd9a8">Pendiente</span><span style="--c:#bcd7f7">Aprobado</span>';
+  el.appendChild(leg);
+  if(vSel){
+    const i=document.createElement('div');i.className='sub';i.style.marginTop='10px';
+    const lines=[];
+    if(fmap[vSel])lines.push('<b>Festivo:</b> '+esc(fmap[vSel].nombre)+(fmap[vSel].tipo==='local'?' (local)':''));
+    (day[vSel]||[]).forEach(v=>lines.push((isAdmin?esc(v.nombre)+': ':'')+(v.estado==='aprobada'?'vacaciones aprobadas':'pendiente de aprobar')));
+    i.innerHTML='<b>'+fmtDate(vSel)+'</b>'+(lines.length?'<br>'+lines.join('<br>'):' · Sin nada');
+    el.appendChild(i);
+  }
+}
 function drawVac(){
   if(!$('#v-anio')||!sess)return;
+  drawVacCal();
   const cur=new Date().getFullYear();
   const yrs=[...new Set([cur,cur+1].concat(festivos.map(f=>+f.fecha.slice(0,4))).concat(vacs.flatMap(v=>Object.keys(v.porAnio||{}).map(Number))))].sort((a,b)=>a-b);
   if(!yrs.includes(+vAnio))vAnio=String(cur);
