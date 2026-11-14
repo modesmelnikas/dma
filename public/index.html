@@ -127,7 +127,11 @@ body.locked{background:transparent}
 body.locked::before{content:"";position:fixed;inset:0;z-index:-1;background:#4a3520 url(/fondo.jpg) center/cover no-repeat}
 body.locked::after{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(30,20,10,.25),rgba(30,20,10,.45))}
 body.locked header.top{display:none}
-body.locked main{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;max-width:none}
+html:has(body.locked){overflow:hidden;overscroll-behavior:none;height:100%}
+body.locked{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none}
+body.locked input,body.locked button{touch-action:manipulation}
+body.locked main{height:100%;min-height:0;display:flex;align-items:center;justify-content:center;padding:20px;max-width:none;overflow:hidden}
+body.locked #login,body.locked #cambio{max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain}
 body.locked #notice{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:5;width:min(420px,92vw)}
 body.locked #login,body.locked #cambio{width:100%;max-width:400px;margin:0;padding:26px 24px 24px;background:rgba(251,246,236,.94);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.6);border-radius:16px;box-shadow:0 18px 50px rgba(30,18,6,.45)}
 .lhead{text-align:center;margin-bottom:10px}
