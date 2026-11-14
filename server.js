@@ -19,7 +19,7 @@ if (!mock && (!env.MONDAY_API_TOKEN || !B.obras || !B.personal || !B.registros |
 const mon = mock ? makeMock() : makeMonday(env.MONDAY_API_TOKEN);
 
 const COLS = {
-  obras: ['cliente', 'nif', 'direccion', 'ubicacion', 'tipo', 'desplazamiento', 'codigo', 'activa', 'clienteid', 'estado', 'importe', 'fechaestado'],
+  obras: ['cliente', 'nif', 'direccion', 'ubicacion', 'tipo', 'desplazamiento', 'codigo', 'activa', 'clienteid', 'estado', 'importe', 'importefinal', 'fechaestado'],
   personal: ['usuario', 'rol', 'salt', 'hash', 'mustchange', 'activo'],
   clientes: ['nif', 'direccion', 'contacto', 'telefono', 'email', 'notas'],
   registros: ['obraid', 'obranombre', 'uid', 'nombreop', 'fecha', 'horas', 'entrada', 'salida', 'comida', 'trabajo'],
@@ -51,7 +51,7 @@ const obraOut = (r, cli, adm) => {
   if (!adm) return o;
   const c = cli || null;
   return Object.assign(o, { cliente: c ? c.nombre : r.cliente, nif: c ? c.nif : r.nif, direccion: c ? c.direccion : r.direccion, ubicacion: r.ubicacion,
-    clienteId: c ? c.id : '', estado: ESTADOS.includes(r.estado) ? r.estado : 'presupuesto_pendiente', importe: Number(r.importe) || 0, fechaEstado: r.fechaestado });
+    clienteId: c ? c.id : '', estado: ESTADOS.includes(r.estado) ? r.estado : 'presupuesto_pendiente', importe: Number(r.importe) || 0, importeFinal: Number(r.importefinal) || 0, fechaEstado: r.fechaestado });
 };
 const cliOut = (r) => ({ id: r.id, nombre: r.nombre, nif: r.nif, direccion: r.direccion, contacto: r.contacto, telefono: r.telefono, email: r.email, notas: r.notas, ts: r.ts });
 const regOut = (r) => ({ id: r.id, obraId: r.obraid, obraNombre: r.obranombre, uid: r.uid, nombreOp: r.nombreop, fecha: r.fecha,
@@ -155,7 +155,8 @@ async function obraVals(b, partial) {
   if (!partial || 'nombre' in b) out.name = t(b.nombre);
   for (const k of ['ubicacion', 'tipo']) if (!partial || k in b) vals[k] = t(b[k]);
   if (!partial || 'desplazamiento' in b) vals.desplazamiento = String(Math.max(0, Math.min(24, Number(b.desplazamiento) || 0)));
-  if (!partial || 'importe' in b) vals.importe = String(Math.max(0, Number(String(b.importe == null ? 0 : b.importe).replace(',', '.')) || 0));
+  for (const [k, col] of [['importe', 'importe'], ['importeFinal', 'importefinal']])
+    if (!partial || k in b) vals[col] = String(Math.max(0, Number(String(b[k] == null ? 0 : b[k]).replace(',', '.')) || 0));
   if (!partial || 'clienteId' in b) {
     const c = b.clienteId ? (await load('clientes')).find((x) => x.id === String(b.clienteId)) : null;
     vals.clienteid = c ? c.id : ''; vals.cliente = c ? c.nombre : '';

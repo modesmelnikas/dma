@@ -155,6 +155,11 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
 .st-facturado{background:#e8e2d6;color:#5a4a33}
 .cl-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .cl-imp{font-weight:700;white-space:nowrap}
+.imp-row{margin-top:10px}
+.imp-row label{margin-top:0}
+.imp{position:relative}
+.imp input{padding-right:26px;text-align:right}
+.imp span{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--mut);pointer-events:none}
 .cl-obra{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
 .cl-actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .cl-actions select{width:100%;flex:1 1 100%;padding:8px}
@@ -304,7 +309,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
       <label for="o-desp">Tiempo de desplazamiento, ida y vuelta (horas por día)</label>
       <input id="o-desp" type="number" inputmode="decimal" step="0.25" min="0" max="12" placeholder="p. ej. 1">
       <div class="grid2">
-        <div id="o-importe-w" hidden><label for="o-importe">Importe del presupuesto (€)</label><input id="o-importe" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+        <div id="o-importe-w" hidden><label for="o-importe">Importe previsto (€)</label><input id="o-importe" inputmode="decimal" autocomplete="off" placeholder="0"></div>
         <div><label for="o-estado">Estado</label><select id="o-estado"></select></div>
       </div>
       <div class="row" style="margin-top:16px">
@@ -665,7 +670,7 @@ function fillObraCli(){
 function drawObras(){
   updateCodeInfo();fillObraCli();
   const n=k=>obras.filter(o=>o.estado===k).length;
-  const sumE=k=>obras.filter(o=>o.estado===k).reduce((a,o)=>a+(o.importe||0),0);
+  const sumE=k=>obras.filter(o=>o.estado===k).reduce((a,o)=>a+(o.importeFinal||o.importe||0),0);
   const rs=$('#ob-resumen');
   rs.innerHTML='<div class="card"><div class="todo">'
     +'<div class="t'+(n('presupuesto_pendiente')?' warn':'')+'"><b>'+n('presupuesto_pendiente')+'</b>Presupuestos por enviar</div>'
@@ -684,15 +689,31 @@ function drawObras(){
     const c=document.createElement('div');c.className='card'+(o.activa?'':' closed');
     const l1=[tipoES(o.tipo),o.cliente,o.nif?'NIF '+o.nif:'',o.desplazamiento?'Desplazamiento '+fmtH(+o.desplazamiento)+' h':''].filter(Boolean).map(esc).join(' · ');
     const l2=[o.ubicacion?'📍 '+o.ubicacion:'',o.direccion?'Dir. social: '+o.direccion:''].filter(Boolean).map(esc).join(' · ');
-    c.innerHTML='<div class="cl-top"><div><b>'+(o.codigo?'<span class="pill">'+esc(o.codigo)+'</span> ':'')+esc(o.nombre)+'</b>'+(l1?'<div class="sub">'+l1+'</div>':'')+(l2?'<div class="sub">'+l2+'</div>':'')+'<div class="sub">'+fmtH(horas)+' h registradas'+(o.activa?'':' · Cerrada')+'</div></div><div class="cl-imp">'+(o.importe?eur(o.importe):'')+'</div></div>'
+    c.innerHTML='<div class="cl-top"><div><b>'+(o.codigo?'<span class="pill">'+esc(o.codigo)+'</span> ':'')+esc(o.nombre)+'</b>'+(l1?'<div class="sub">'+l1+'</div>':'')+(l2?'<div class="sub">'+l2+'</div>':'')+'<div class="sub">'+fmtH(horas)+' h registradas'+(o.activa?'':' · Cerrada')+'</div></div></div>'
       +'<div style="margin-top:6px"><span class="st st-'+o.estado+'">'+esc(estLabel(o.estado))+'</span>'+(o.fechaEstado?' <span class="sub">desde '+fmtDate(o.fechaEstado)+'</span>':'')+'</div>';
+    const am=document.createElement('div');am.className='grid2 imp-row';
+    const mkImp=(label,key,val)=>{
+      const w=document.createElement('div');
+      w.innerHTML='<label>'+label+'</label><div class="imp"><input inputmode="decimal" autocomplete="off" placeholder="0"><span>€</span></div>';
+      const inp=w.querySelector('input');inp.value=val?String(val).replace('.',','):'';
+      inp.onkeydown=e=>{if(e.key==='Enter')inp.blur()};
+      inp.onchange=()=>{
+        const raw=inp.value.trim().replace(',','.'),n=raw===''?0:Number(raw);
+        if(isNaN(n)||n<0){inp.value=val?String(val).replace('.',','):'';return notice('Importe no válido.','bad')}
+        if(n===(val||0))return;
+        api('PATCH','/api/obras/'+o.id,{[key]:n}).then(refresh).then(()=>notice('Importe guardado ✔','ok')).catch(()=>notice('No se pudo guardar el importe.','bad'));
+      };
+      am.appendChild(w);
+    };
+    mkImp('Importe previsto','importe',o.importe);mkImp('Importe final','importeFinal',o.importeFinal);
+    c.appendChild(am);
     const act=document.createElement('div');act.className='cl-actions';
     const sel=document.createElement('select');sel.setAttribute('aria-label','Cambiar estado');
     sel.innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'"'+(e[0]===o.estado?' selected':'')+'>'+e[1]+'</option>').join('');
     sel.onchange=async()=>{
       const body={estado:sel.value};
       if(sel.value==='presupuesto_enviado'){
-        const imp=await importeDlg('Presupuesto enviado','Importe del presupuesto de «'+o.nombre+'» (€):',o.importe);
+        const imp=await importeDlg('Presupuesto enviado','Importe previsto del presupuesto de «'+o.nombre+'» (€):',o.importe);
         if(imp===null){sel.value=o.estado;return}
         body.importe=imp;
       }

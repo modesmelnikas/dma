@@ -81,6 +81,8 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
   const xa = dd.obras.find((o) => o.id === oa), xb = dd.obras.find((o) => o.id === ob);
   assert.equal(xa.cliente, 'Fustes Graus'); assert.equal(xa.nif, 'b123'); assert.equal(xa.clienteId, c1);
   assert.equal(xa.estado, 'presupuesto_pendiente'); assert.equal(xa.importe, 1250.5); assert.equal(xb.estado, 'aceptado');
+  assert.equal((await a('PATCH', '/api/obras/' + oa, { importe: '2000', importeFinal: '2150,75' })).s, 200);
+  { const x = (await a('GET', '/api/data')).j.obras.find((o) => o.id === oa); assert.equal(x.importe, 2000); assert.equal(x.importeFinal, 2150.75); assert.equal(x.estado, 'presupuesto_pendiente'); }
   assert.equal((await a('PATCH', '/api/obras/' + oa, { estado: 'inventado' })).s, 400);
   assert.equal((await a('PATCH', '/api/obras/' + oa, { estado: 'presupuesto_enviado' })).s, 200);
   assert.equal((await a('GET', '/api/data')).j.obras.find((o) => o.id === oa).estado, 'presupuesto_enviado');
