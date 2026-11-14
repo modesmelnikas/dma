@@ -2,7 +2,14 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#efe4d0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="DMA Obras">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Registro de obras</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -116,6 +123,17 @@ body.locked #login,body.locked #cambio{width:100%;max-width:400px;margin:0;paddi
 .lhead img{height:84px;width:auto;display:block;margin:0 auto 10px}
 .lhead h2{margin:0;font-size:18px;color:var(--acc)}
 .lhead .sub{margin-top:2px}
+
+/* ---- barra inferior (móvil / app) ---- */
+#bnav{display:none}
+@media (max-width:900px){
+  body:not(.locked) #bnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--beige);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom));box-shadow:0 -4px 14px rgba(60,40,15,.12)}
+  #bnav button{flex:1;border:0;background:none;color:var(--mut);font:600 11px/1.1 inherit;font-family:inherit;padding:6px 2px;border-radius:10px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;min-width:0}
+  #bnav button span.i{font-size:20px;line-height:1}
+  #bnav button.on{color:var(--acc);background:rgba(75,57,37,.1)}
+  body:not(.locked) main{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+  header.top{padding-top:calc(8px + env(safe-area-inset-top))}
+}
 @media (max-width:900px){nav.tabs,#perfilBtn,#salir{display:none}#burger{display:inline-block}header.top h1 small{max-width:48vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 @media (max-width:600px){input,select,textarea{font-size:16px}header.top img{height:46px}}
 </style>
@@ -290,6 +308,7 @@ body.locked #login,body.locked #cambio{width:100%;max-width:400px;margin:0;paddi
     <div id="p-list"></div>
   </section>
 </main>
+<div id="bnav" role="tablist"></div>
 
 <div class="overlay" id="dlg" hidden>
   <div class="modal">
@@ -1071,7 +1090,19 @@ function startSession(p){
   enterApp();
 }
 function tabLabels(){const b=document.querySelector('#nav [data-t="mis"]');if(b)b.textContent=isAdmin?'Registros':'Mis registros';buildMmenu()}
+const TABICON={nuevo:'➕',mis:'📋',panel:'📊',obras:'🏗️',personal:'👥'};
+const TABSHORT={nuevo:'Nuevo',mis:'Registros',panel:'Panel',obras:'Obras',personal:'Personal'};
+function buildBnav(){
+  const bar=$('#bnav');if(!bar)return;bar.innerHTML='';
+  document.querySelectorAll('#nav button').forEach(nb=>{
+    if(nb.hidden)return;
+    const b=document.createElement('button');b.type='button';if(nb.dataset.t===tab)b.className='on';
+    b.innerHTML='<span class="i">'+TABICON[nb.dataset.t]+'</span>'+TABSHORT[nb.dataset.t];
+    b.onclick=()=>setTab(nb.dataset.t);bar.appendChild(b);
+  });
+}
 function buildMmenu(){
+  buildBnav();
   const m=$('#mmenu');if(!m)return;
   m.innerHTML='';
   const add=(txt,fn,on)=>{const b=document.createElement('button');b.textContent=txt;if(on)b.className='on';b.onclick=fn;m.appendChild(b)};
@@ -1229,6 +1260,7 @@ async function init(){
 }
 init();
 })();
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 </script>
 </body>
 </html>
