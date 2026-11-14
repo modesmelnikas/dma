@@ -300,7 +300,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
       <label for="o-desp">Tiempo de desplazamiento, ida y vuelta (horas por día)</label>
       <input id="o-desp" type="number" inputmode="decimal" step="0.25" min="0" max="12" placeholder="p. ej. 1">
       <div class="grid2">
-        <div><label for="o-importe">Importe (€)</label><input id="o-importe" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+        <div id="o-importe-w" hidden><label for="o-importe">Importe del presupuesto (€)</label><input id="o-importe" inputmode="decimal" autocomplete="off" placeholder="0"></div>
         <div><label for="o-estado">Estado</label><select id="o-estado"></select></div>
       </div>
       <div class="row" style="margin-top:16px">
@@ -374,6 +374,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
   <div class="modal">
     <h2 id="dlg-t"></h2>
     <p id="dlg-p" style="margin:0 0 16px"></p>
+    <input id="dlg-in" inputmode="decimal" autocomplete="off" hidden style="margin:-4px 0 16px">
     <div class="row" style="justify-content:flex-end">
       <button class="btn sec" id="dlg-no" type="button">Cancelar</button>
       <button class="btn" id="dlg-yes" type="button" style="background:#dc2626">Eliminar</button>
@@ -546,7 +547,7 @@ $('#o-tipo').innerHTML='<option value="">Elige…</option>'+TIPOS.map(t=>'<optio
 $('#o-tipo').onchange=()=>{$('#o-tipo-otro').hidden=$('#o-tipo').value!=='__otro'};
 function resetObraForm(){
   editObra=null;
-  ['o-nombre','o-ubi','o-desp','o-tipo-otro','o-importe'].forEach(i=>$('#'+i).value='');$('#o-cliente').value='';$('#o-estado').value='presupuesto_pendiente';
+  ['o-nombre','o-ubi','o-desp','o-tipo-otro','o-importe'].forEach(i=>$('#'+i).value='');$('#o-cliente').value='';$('#o-estado').value='presupuesto_pendiente';showImp();
   $('#o-tipo').value='';$('#o-tipo-otro').hidden=true;
   $('#o-title').textContent='Nueva obra';$('#crearObra').textContent='Crear obra';$('#cancelObra').hidden=true;
   updateCodeInfo();
@@ -555,7 +556,7 @@ $('#cancelObra').onclick=resetObraForm;
 function startEdit(o){
   editObra=o.id;
   $('#o-nombre').value=o.nombre||'';fillObraCli();$('#o-cliente').value=o.clienteId||'';
-  $('#o-importe').value=o.importe?String(o.importe).replace('.',','):'';$('#o-estado').value=o.estado||'presupuesto_pendiente';
+  $('#o-importe').value=o.importe?String(o.importe).replace('.',','):'';$('#o-estado').value=o.estado||'presupuesto_pendiente';showImp();
   $('#o-ubi').value=o.ubicacion||'';$('#o-desp').value=o.desplazamiento!=null?o.desplazamiento:'';
   const tp=tipoES(o.tipo);
   if(!tp){$('#o-tipo').value='';$('#o-tipo-otro').value=''}
@@ -584,6 +585,7 @@ $('#crearObra').onclick=async()=>{
   if(tipo==='__otro'){tipo=$('#o-tipo-otro').value.trim();if(!tipo)return notice('Especifica el tipo de obra.','bad')}
   const desp=parseFloat(String($('#o-desp').value).replace(',','.'));
   if($('#o-desp').value!==''&&!(desp>=0&&desp<=12))return notice('El desplazamiento tiene que estar entre 0 y 12 horas.','bad');
+  if($('#o-estado').value==='presupuesto_enviado'&&!(Number(String($('#o-importe').value).replace(',','.'))>0))return notice('Indica el importe del presupuesto enviado.','bad');
   const data={desplazamiento:isNaN(desp)?0:desp,nombre,clienteId:$('#o-cliente').value,ubicacion:$('#o-ubi').value.trim(),tipo,importe:$('#o-importe').value,estado:$('#o-estado').value};
   try{
     if(editObra){
@@ -598,9 +600,25 @@ $('#crearObra').onclick=async()=>{
 function confirmDlg(title,text,okLabel){
   return new Promise(res=>{
     $('#dlg-t').textContent=title;$('#dlg-p').textContent=text;$('#dlg-yes').textContent=okLabel||'Aceptar';
+    $('#dlg-in').hidden=true;$('#dlg-yes').style.background='#dc2626';
     const d=$('#dlg');d.hidden=false;
     const done=v=>{d.hidden=true;$('#dlg-yes').onclick=$('#dlg-no').onclick=null;res(v)};
     $('#dlg-yes').onclick=()=>done(true);$('#dlg-no').onclick=()=>done(false);
+  });
+}
+function importeDlg(title,text,initial){
+  return new Promise(res=>{
+    $('#dlg-t').textContent=title;$('#dlg-p').textContent=text;$('#dlg-yes').textContent='Guardar';$('#dlg-yes').style.background='';
+    const inp=$('#dlg-in');inp.hidden=false;inp.value=initial?String(initial).replace('.',','):'';
+    const d=$('#dlg');d.hidden=false;setTimeout(()=>inp.focus(),50);
+    const done=v=>{d.hidden=true;inp.hidden=true;$('#dlg-yes').onclick=$('#dlg-no').onclick=inp.onkeydown=null;res(v)};
+    $('#dlg-yes').onclick=()=>{
+      const n=Number(String(inp.value).replace(',','.'));
+      if(!(n>0)){inp.style.borderColor='#dc2626';return}
+      inp.style.borderColor='';done(String(n));
+    };
+    $('#dlg-no').onclick=()=>done(null);
+    inp.onkeydown=e=>{if(e.key==='Enter')$('#dlg-yes').click()};
   });
 }
 async function deleteObra(o){
@@ -628,6 +646,8 @@ const estLabel=k=>(ESTADOS.find(e=>e[0]===k)||[0,k])[1];
 const eur=n=>(Math.round((n||0)*100)/100).toLocaleString('es-ES')+' €';
 let oFiltro='';
 $('#o-estado').innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'">'+e[1]+'</option>').join('');
+function showImp(){const w=$('#o-importe-w');w.hidden=$('#o-estado').value==='presupuesto_pendiente'}
+$('#o-estado').onchange=showImp;
 function fillObraCli(){
   const sel=$('#o-cliente'),v=sel.value;
   sel.innerHTML='<option value="">Sin cliente</option>'+clientes.slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'')).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.nombre)+'</option>').join('');
@@ -660,7 +680,15 @@ function drawObras(){
     const act=document.createElement('div');act.className='cl-actions';
     const sel=document.createElement('select');sel.setAttribute('aria-label','Cambiar estado');
     sel.innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'"'+(e[0]===o.estado?' selected':'')+'>'+e[1]+'</option>').join('');
-    sel.onchange=()=>api('PATCH','/api/obras/'+o.id,{estado:sel.value}).then(refresh).catch(()=>{sel.value=o.estado;notice('No se pudo cambiar el estado.','bad')});
+    sel.onchange=async()=>{
+      const body={estado:sel.value};
+      if(sel.value==='presupuesto_enviado'){
+        const imp=await importeDlg('Presupuesto enviado','Importe del presupuesto de «'+o.nombre+'» (€):',o.importe);
+        if(imp===null){sel.value=o.estado;return}
+        body.importe=imp;
+      }
+      api('PATCH','/api/obras/'+o.id,body).then(refresh).catch(()=>{sel.value=o.estado;notice('No se pudo cambiar el estado.','bad')});
+    };
     const e=document.createElement('button');e.className='btn sec';e.textContent='Editar';e.onclick=()=>startEdit(o);
     const b=document.createElement('button');b.className='btn sec';b.textContent=o.activa?'Cerrar':'Reabrir';
     b.onclick=()=>api('PATCH','/api/obras/'+o.id,{activa:!o.activa}).then(refresh).catch(()=>notice('No se pudo actualizar.','bad'));
