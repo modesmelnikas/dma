@@ -1,0 +1,9 @@
+{
+  "name": "dma-registro-obras",
+  "version": "1.0.0",
+  "description": "Registro de obras y horas - DMA Estructures i Cobertes S.L. (Monday como base de datos)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node test/run.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "bcryptjs": "^2.4.3", "express": "^4.19.2" }
+}
