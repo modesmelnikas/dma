@@ -284,7 +284,8 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
   </section>
 
   <section id="s-obras">
-    <div class="card" id="obraForm">
+    <div class="row" style="margin-bottom:10px"><button class="btn" id="ob-nueva" type="button">+ Obra nueva</button></div>
+    <div class="card" id="obraForm" hidden>
       <b id="o-title">Nueva obra</b>
       <div class="sub" id="o-codinfo" style="margin:6px 0 0"></div>
       <label for="o-nombre">Nombre de la obra</label>
@@ -305,7 +306,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
       </div>
       <div class="row" style="margin-top:16px">
         <button class="btn big" id="crearObra" type="button" style="margin-top:0">Crear obra</button>
-        <button class="btn sec" id="cancelObra" type="button" hidden>Cancelar</button>
+        <button class="btn sec" id="cancelObra" type="button">Cancelar</button>
       </div>
     </div>
     <div id="ob-resumen"></div>
@@ -549,10 +550,15 @@ function resetObraForm(){
   editObra=null;
   ['o-nombre','o-ubi','o-desp','o-tipo-otro','o-importe'].forEach(i=>$('#'+i).value='');$('#o-cliente').value='';$('#o-estado').value='presupuesto_pendiente';showImp();
   $('#o-tipo').value='';$('#o-tipo-otro').hidden=true;
-  $('#o-title').textContent='Nueva obra';$('#crearObra').textContent='Crear obra';$('#cancelObra').hidden=true;
+  $('#o-title').textContent='Nueva obra';$('#crearObra').textContent='Crear obra';$('#obraForm').hidden=true;
   updateCodeInfo();
 }
 $('#cancelObra').onclick=resetObraForm;
+$('#ob-nueva').onclick=()=>{
+  const open=!$('#obraForm').hidden&&!editObra;
+  resetObraForm();
+  if(!open){$('#obraForm').hidden=false;$('#obraForm').scrollIntoView({behavior:'smooth',block:'start'})}
+};
 function startEdit(o){
   editObra=o.id;
   $('#o-nombre').value=o.nombre||'';fillObraCli();$('#o-cliente').value=o.clienteId||'';
@@ -563,7 +569,7 @@ function startEdit(o){
   else if(TIPOS.includes(tp)){$('#o-tipo').value=tp;$('#o-tipo-otro').value=''}
   else{$('#o-tipo').value='__otro';$('#o-tipo-otro').value=tp}
   $('#o-tipo-otro').hidden=$('#o-tipo').value!=='__otro';
-  $('#o-title').textContent='Editando: '+o.nombre;$('#crearObra').textContent='Guardar cambios';$('#cancelObra').hidden=false;
+  $('#o-title').textContent='Editando: '+o.nombre;$('#crearObra').textContent='Guardar cambios';$('#obraForm').hidden=false;
   updateCodeInfo();
   $('#obraForm').scrollIntoView({behavior:'smooth',block:'start'});
 }
