@@ -143,11 +143,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
   #bnav button.on{color:var(--acc)}
   #bnav button.on::before{content:"";position:absolute;top:-5px;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--acc)}
   body:not(.locked) main{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
-  header.top{padding-top:calc(8px + env(safe-area-inset-top));display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px}
-  header.top .brand{display:contents}
-  header.top .brand img{grid-column:2;grid-row:1;justify-self:center}
-  header.top h1.dma{grid-column:1;grid-row:1;min-width:0}
-  header.top .hright{grid-column:3;grid-row:1}
+  header.top{padding-top:calc(8px + env(safe-area-inset-top))}
   header.top #who{gap:3px}
   header.top #who .wn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
 }
