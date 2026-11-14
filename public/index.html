@@ -314,7 +314,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
         <div><label for="p-rol">Tipo</label><select id="p-rol"><option value="operario">Operario</option><option value="admin">Administrador</option></select></div>
       </div>
       <label for="p-pass">Contraseña temporal</label>
-      <div class="row"><input id="p-pass" autocomplete="off" spellcheck="false"><button class="btn sec" id="p-gen" type="button">Generar</button></div>
+      <input id="p-pass" autocomplete="off" spellcheck="false" placeholder="Mínimo 6 caracteres">
       <div class="sub" style="margin-top:6px">Se la das en persona. Tendrá que cambiarla la primera vez que entre.</div>
       <button class="btn big" id="p-crear" type="button">Crear usuario</button>
     </div>
@@ -1215,7 +1215,6 @@ function syncSession(){
 }
 
 /* ---------- personal (admin) ---------- */
-$('#p-gen').onclick=()=>{$('#p-pass').value=genPw()};
 $('#p-crear').onclick=async()=>{
   const nombre=$('#p-nombre').value.trim(),usuario=$('#p-user').value.trim().toLowerCase(),rol=$('#p-rol').value,pw=$('#p-pass').value;
   if(!nombre)return pmsg('Escribe el nombre completo.','bad');
@@ -1225,7 +1224,7 @@ $('#p-crear').onclick=async()=>{
   try{
     await api('POST','/api/personal',{nombre,usuario,rol,password:pw});await refresh();
     pmsg('Usuario «'+usuario+'» creado. Contraseña temporal: '+pw+' — entrégasela en persona; tendrá que cambiarla al entrar.','ok');
-    ['p-nombre','p-user'].forEach(i=>$('#'+i).value='');$('#p-rol').value='operario';$('#p-pass').value=genPw();
+    ['p-nombre','p-user'].forEach(i=>$('#'+i).value='');$('#p-rol').value='operario';$('#p-pass').value='';
   }catch(e){pmsg(e.status?e.message:'No se pudo crear el usuario.','bad')}
 };
 async function resetPw(p){
@@ -1242,7 +1241,6 @@ async function delPerson(p){
 }
 function drawPersonal(){
   const el=$('#p-list');if(!el)return;
-  if(!$('#p-pass').value)$('#p-pass').value=genPw();
   if(!personal.length){el.innerHTML='<div class="empty">Todavía no hay usuarios. Crea el primero arriba.</div>';return}
   el.innerHTML='';
   personal.forEach(p=>{
