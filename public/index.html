@@ -442,7 +442,16 @@ function bdPills(r){
 }
 const nameOf=uid=>{const p=personal.find(x=>x.id===uid);return p?p.nombre:(snapNames[uid]||names[uid]||'Operario')};
 
-function notice(text,kind){const n=$('#notice');n.innerHTML=text?'<div class="msg '+(kind||'')+'">'+esc(text)+'</div>':''}
+const msgTimers={};
+function flash(id,text,kind,ms){
+  const n=$('#'+id);clearTimeout(msgTimers[id]);
+  n.innerHTML=text?'<div class="msg '+(kind||'')+'" style="cursor:pointer" title="Toca para cerrar">'+esc(text)+'</div>':'';
+  if(!text)return;
+  const m=n.firstChild;m.onclick=()=>{clearTimeout(msgTimers[id]);n.innerHTML=''};
+  const dur=ms||(kind==='bad'?6000:3500);
+  msgTimers[id]=setTimeout(()=>{n.innerHTML=''},dur);
+}
+function notice(text,kind){flash('notice',text,kind)}
 
 /* ---------- navegación ---------- */
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>setTab(b.dataset.t));
@@ -1161,7 +1170,7 @@ function genPw(){
 }
 
 /* ---------- sesión ---------- */
-function pmsg(text,kind){const n=$('#p-msg');n.innerHTML=text?'<div class="msg '+(kind||'')+'">'+esc(text)+'</div>':''}
+function pmsg(text,kind,ms){flash('p-msg',text,kind,ms)}
 function setWho(){const w=$('#who');if(!sess){w.textContent='';return}w.innerHTML='<span class="wn">'+esc(sess.nombre)+'</span>'+(sess.rol==='admin'?'<span class="wr">Administrador</span>':'')}
 function setLogos(){const src=(document.querySelector('header.top img')||{}).src;document.querySelectorAll('.llogo').forEach(i=>{if(src&&i.src!==src)i.src=src})}
 function showLogin(){setLogos();
@@ -1357,7 +1366,7 @@ async function resetPw(p){
   try{
     const pw=genPw();
     await api('PATCH','/api/personal/'+p.id,{password:pw});await refresh();
-    pmsg('Contraseña temporal de '+p.nombre+': '+pw+' — entrégasela en persona.','ok');
+    pmsg('Contraseña temporal de '+p.nombre+': '+pw+' — entrégasela en persona.','ok',30000);
   }catch(_){pmsg('No se pudo restablecer la contraseña.','bad')}
 }
 async function delPerson(p){
