@@ -16,7 +16,7 @@
 <style>
 :root{--bg:#f7f1e7;--card:#fff;--ink:#2b2118;--mut:#7a6a58;--line:#e6dccb;--acc:#4b3925;--acc-d:#34261a;--acc-ink:#fff;--beige:#efe4d0;--beige-l:#fcf7f1;--ok:#166534;--bad:#b91c1c;--radius:12px}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+html,body{touch-action:manipulation;-webkit-text-size-adjust:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 header.top{background:var(--beige);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:8px clamp(8px,1.6vw,28px);flex-wrap:nowrap;position:relative}
@@ -52,6 +52,8 @@ textarea{min-height:90px;resize:vertical}
 .btn.sec:hover{background:var(--beige-l)}
 .btn.del{background:#fff;color:#dc2626;border:1px solid #fecaca;font-weight:500;padding:3px 9px;font-size:12px}
 .btn:disabled{opacity:.5;cursor:default}
+.pcol{display:flex;flex-direction:column;gap:6px;align-items:stretch;justify-content:center;min-width:170px}
+.pcol .btn{width:100%;padding:8px 12px;font-size:13px;line-height:1.2;text-align:center;display:flex;align-items:center;justify-content:center}
 .sub{color:var(--mut);font-size:12px}
 .msg{padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:12px;border:1px solid var(--line);background:#fff}
 .msg.ok{color:var(--ok);background:#f0fdf4;border-color:#bbf7d0}.msg.bad{color:var(--bad);background:#fef2f2;border-color:#fecaca}
@@ -572,7 +574,7 @@ function drawObras(){
     const l1=[tipoES(o.tipo),o.cliente,o.nif?'NIF '+o.nif:'',o.desplazamiento?'Desplazamiento '+fmtH(+o.desplazamiento)+' h':''].filter(Boolean).map(esc).join(' · ');
     const l2=[o.ubicacion?'📍 '+o.ubicacion:'',o.direccion?'Dir. social: '+o.direccion:''].filter(Boolean).map(esc).join(' · ');
     c.innerHTML='<div style="flex:1"><b>'+(o.codigo?'<span class="pill">'+esc(o.codigo)+'</span> ':'')+esc(o.nombre)+'</b>'+(l1?'<div class="sub">'+l1+'</div>':'')+(l2?'<div class="sub">'+l2+'</div>':'')+'<div class="sub">'+fmtH(horas)+' h registradas'+(o.activa?'':' · cerrada')+'</div></div>';
-    const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;gap:6px';
+    const col=document.createElement('div');col.className='pcol';
     const e=document.createElement('button');e.className='btn sec';e.textContent='Editar';e.onclick=()=>startEdit(o);
     const b=document.createElement('button');b.className='btn sec';b.textContent=o.activa?'Cerrar':'Reabrir';
     b.onclick=()=>api('PATCH','/api/obras/'+o.id,{activa:!o.activa}).then(refresh).catch(()=>notice('No se pudo actualizar.','bad'));
@@ -1237,11 +1239,10 @@ function drawPersonal(){
     const c=document.createElement('div');c.className='card row'+(p.activo===false?' closed':'');
     const estado=p.activo===false?'Desactivado':(p.mustChange?'Pendiente de cambiar la contraseña':'Activo');
     c.innerHTML='<div style="flex:1"><b>'+esc(p.nombre)+'</b> <span class="pill">'+(p.rol==='admin'?'Administrador':'Operario')+'</span><div class="sub">Usuario: '+esc(p.usuario)+' · '+estado+(self?' · (tú)':'')+'</div></div>';
-    const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;gap:6px';
+    const col=document.createElement('div');col.className='pcol';
     const mk=(txt,cls,fn,dis)=>{const b=document.createElement('button');b.className='btn '+cls;b.textContent=txt;b.disabled=!!dis;b.onclick=fn;col.appendChild(b)};
     mk('Restablecer contraseña','sec',()=>resetPw(p));
     mk(p.rol==='admin'?'Pasar a Operario':'Pasar a Administrador','sec',()=>api('PATCH','/api/personal/'+p.id,{rol:p.rol==='admin'?'operario':'admin'}).then(refresh).catch(()=>pmsg('No se pudo cambiar.','bad')),self);
-    mk(p.activo===false?'Activar':'Desactivar','sec',()=>api('PATCH','/api/personal/'+p.id,{activo:p.activo===false}).then(refresh).catch(()=>pmsg('No se pudo cambiar.','bad')),self);
     mk('Eliminar','del',()=>delPerson(p),self);
     c.appendChild(col);el.appendChild(c);
   });
