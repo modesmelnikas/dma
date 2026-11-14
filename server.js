@@ -107,7 +107,7 @@ const regOut = (r) => ({ id: r.id, obraId: r.obraid, obraNombre: r.obranombre, u
 /* ---------- sesión (cookie firmada) ---------- */
 const b64 = (b) => Buffer.from(b).toString('base64url');
 const sign = (s) => crypto.createHmac('sha256', SECRET).update(s).digest('base64url');
-function makeToken(id) { const body = b64(JSON.stringify({ id, exp: Date.now() + 12 * 3600e3 })); return body + '.' + sign(body); }
+function makeToken(id, secs) { const body = b64(JSON.stringify({ id, exp: Date.now() + secs * 1000 })); return body + '.' + sign(body); }
 function readToken(t) {
   if (!t) return null;
   const [body, sig] = t.split('.');
@@ -165,7 +165,8 @@ app.post('/api/login', wrap(async (req, res) => {
   const ok = p && p.hash && await bcrypt.compare(pw, p.hash);
   if (!ok) { noteFail(key); return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' }); }
   fails.delete(key);
-  setCookie(res, makeToken(p.id), 12 * 3600);
+  const secs = req.body.recordar ? 30 * 86400 : 12 * 3600; // «recordarme»: 30 días
+  setCookie(res, makeToken(p.id, secs), secs);
   res.json({ ok: true });
 }));
 app.post('/api/logout', (req, res) => { setCookie(res, '', 0); res.json({ ok: true }); });

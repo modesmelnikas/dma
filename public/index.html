@@ -234,6 +234,7 @@ details.card[open]>summary::before{content:"▾ "}
     <input id="l-user" autocapitalize="none" autocomplete="username" spellcheck="false">
     <label for="l-pass">Contraseña</label>
     <input id="l-pass" type="password" autocomplete="current-password">
+    <label class="chk" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-weight:500"><input type="checkbox" id="l-rec" style="width:auto;margin:0"> Recordar mi sesión (30 días)</label>
     <button class="btn big" id="l-entrar" type="button">Entrar</button>
   </div>
 
@@ -1391,7 +1392,7 @@ $('#l-entrar').onclick=async()=>{
   const u=$('#l-user').value.trim().toLowerCase(),pw=$('#l-pass').value;
   if(!u||!pw)return notice('Escribe el usuario y la contraseña.','bad');
   try{
-    await api('POST','/api/login',{usuario:u,password:pw});
+    await api('POST','/api/login',{usuario:u,password:pw,recordar:$('#l-rec').checked});
     const m=await api('GET','/api/me');
     notice('');startSession(m);
   }catch(e){$('#l-pass').value='';notice(e.status?e.message:'No se pudo conectar con el servidor.','bad')}
