@@ -658,7 +658,8 @@ function obraName(r){
 const ESTADOS=[['presupuesto_pendiente','Presupuesto pendiente'],['presupuesto_enviado','Presupuesto enviado'],['aceptado','Aceptado'],['factura_pendiente','Factura pendiente'],['facturado','Facturado']];
 const estLabel=k=>(ESTADOS.find(e=>e[0]===k)||[0,k])[1];
 const eur=n=>(Math.round((n||0)*100)/100).toLocaleString('es-ES')+' €';
-let oFiltro='';
+let oFiltro='',oAnio=String(new Date().getFullYear());
+const obraAnio=o=>new Date(o.ts||Date.now()).getFullYear();
 $('#o-estado').innerHTML=ESTADOS.map(e=>'<option value="'+e[0]+'">'+e[1]+'</option>').join('');
 function showImp(){const w=$('#o-importe-w');w.hidden=$('#o-estado').value==='presupuesto_pendiente'}
 $('#o-estado').onchange=showImp;
@@ -669,20 +670,25 @@ function fillObraCli(){
 }
 function drawObras(){
   updateCodeInfo();fillObraCli();
-  const n=k=>obras.filter(o=>o.estado===k).length;
-  const sumE=k=>obras.filter(o=>o.estado===k).reduce((a,o)=>a+(o.importeFinal||o.importe||0),0);
+  const yrs=[...new Set(obras.map(obraAnio).concat([new Date().getFullYear()]))].sort((x,y)=>y-x);
+  if(oAnio&&!yrs.includes(+oAnio))oAnio='';
+  const ov=obras.filter(o=>!oAnio||obraAnio(o)===+oAnio);
+  const n=k=>ov.filter(o=>o.estado===k).length;
+  const sumE=k=>ov.filter(o=>o.estado===k).reduce((a,o)=>a+(o.importeFinal||o.importe||0),0);
   const rs=$('#ob-resumen');
-  rs.innerHTML='<div class="card"><div class="todo">'
+  rs.innerHTML='<div class="card"><label for="ob-anio" style="margin-top:0">Año</label><select id="ob-anio"><option value="">Todos los años</option>'+yrs.map(y=>'<option value="'+y+'"'+(String(y)===oAnio?' selected':'')+'>'+y+'</option>').join('')+'</select>'
+    +'<div class="todo" style="margin-top:12px">'
     +'<div class="t'+(n('presupuesto_pendiente')?' warn':'')+'"><b>'+n('presupuesto_pendiente')+'</b>Presupuestos por enviar</div>'
     +'<div class="t'+(n('factura_pendiente')?' bad':'')+'"><b>'+n('factura_pendiente')+'</b>Facturas por enviar'+(n('factura_pendiente')&&sumE('factura_pendiente')?'<div class="sub">'+eur(sumE('factura_pendiente'))+'</div>':'')+'</div>'
     +'</div><div class="chips" id="ob-chips"></div></div>';
+  $('#ob-anio').onchange=e=>{oAnio=e.target.value;drawObras()};
   const chips=$('#ob-chips');
   const addChip=(k,txt,cnt)=>{const b=document.createElement('button');b.type='button';b.className='chip'+(oFiltro===k?' on':'');b.innerHTML=esc(txt)+'<b>'+cnt+'</b>';b.onclick=()=>{oFiltro=k;drawObras()};chips.appendChild(b)};
-  addChip('','Todas',obras.length);ESTADOS.forEach(e=>addChip(e[0],e[1],n(e[0])));
+  addChip('','Todas',ov.length);ESTADOS.forEach(e=>addChip(e[0],e[1],n(e[0])));
   const el=$('#obrasList');
   if(!obras.length){el.innerHTML='<div class="empty">Todavía no hay obras. Crea la primera arriba.</div>';return}
-  const list=obras.filter(o=>!oFiltro||o.estado===oFiltro);
-  if(!list.length){el.innerHTML='<div class="empty">No hay obras con este estado.</div>';return}
+  const list=ov.filter(o=>!oFiltro||o.estado===oFiltro);
+  if(!list.length){el.innerHTML='<div class="empty">No hay obras con este filtro.</div>';return}
   el.innerHTML='';
   list.forEach(o=>{
     const horas=regs.filter(r=>r.obraId===o.id).reduce((a,r)=>a+(+r.horas||0),0);
