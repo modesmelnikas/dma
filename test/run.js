@@ -96,6 +96,45 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
   assert.equal((await m3('PATCH', '/api/obras/' + oa, { estado: 'facturado' })).s, 403);
   assert.equal((await a('DELETE', '/api/clientes/' + c1)).s, 200);
   dd = (await a('GET', '/api/data')).j; assert.equal(dd.clientes.length, 0); assert.equal(dd.obras.find((o) => o.id === oa).clienteId, '');
+  // VACACIONES
+  const mid2 = (await a('GET', '/api/data')).j.personal.find((p) => p.usuario === 'marc').id;
+  assert.equal((await a('PATCH', '/api/personal/' + mid2, { vacaciones: '22' })).s, 200);
+  assert.equal((await a('GET', '/api/data')).j.festivos.length, 26);
+  const v = client(); assert.equal((await v('POST', '/api/login', { usuario: 'marc', password: 'marc5678' })).s, 200);
+  let vd = (await v('GET', '/api/data')).j; assert.equal(vd.personal[0].vacaciones, 22); assert.equal(vd.festivos.length, 26);
+  // lunes 2026-12-21 a viernes 2027-01-01 (dos semanas): 25 y 26 dic caen en vie/sab, 1 ene festivo => 10 dias - 25 dic(vie) - 1 ene(vie) = 8
+  const rv = await v('POST', '/api/vacaciones', { desde: '2026-12-21', hasta: '2027-01-01', nota: 'Navidad' });
+  assert.equal(rv.s, 200); assert.equal(rv.j.dias, 8);
+  vd = (await v('GET', '/api/data')).j; assert.equal(vd.vacaciones[0].dias, 8); assert.deepEqual(vd.vacaciones[0].porAnio, { 2026: 8 }); assert.equal(vd.vacaciones[0].estado, 'pendiente');
+  // fin de semana puro y solapes
+  assert.equal((await v('POST', '/api/vacaciones', { desde: '2026-11-14', hasta: '2026-11-15' })).s, 400);
+  assert.equal((await v('POST', '/api/vacaciones', { desde: '2026-12-28', hasta: '2026-12-30' })).s, 400);
+  assert.equal((await v('POST', '/api/vacaciones', { desde: '2026-02-10', hasta: '2026-01-10' })).s, 400);
+  // dos semanas lunes-viernes de agosto: 10 dias (15 ago sabado no cuenta)
+  assert.equal((await v('POST', '/api/vacaciones', { desde: '2026-08-03', hasta: '2026-08-14' })).j.dias, 10);
+  // exceder lo asignado (22 - 5 de 2026 - 10 = 7 restantes en 2026)
+  const ex = await v('POST', '/api/vacaciones', { desde: '2026-10-05', hasta: '2026-10-23' }); assert.equal(ex.s, 400); assert.ok(/Te quedan/.test(ex.j.error));
+  // aprobar: solo admin
+  vd = (await v('GET', '/api/data')).j; const rid = vd.vacaciones.find((x) => x.desde === '2026-08-03').id;
+  assert.equal((await v('PATCH', '/api/vacaciones/' + rid, { estado: 'aprobada' })).s, 403);
+  assert.equal((await a('PATCH', '/api/vacaciones/' + rid, { estado: 'aprobada' })).s, 200);
+  assert.equal((await a('PATCH', '/api/vacaciones/' + rid, { estado: 'inventada' })).s, 400);
+  const ad = (await a('GET', '/api/data')).j.vacaciones; assert.equal(ad.length, 2); assert.equal(ad.find((x) => x.id === rid).estado, 'aprobada');
+  // el operario no puede cancelar una aprobada, si una pendiente
+  assert.equal((await v('DELETE', '/api/vacaciones/' + rid)).s, 403);
+  const pid = ad.find((x) => x.estado === 'pendiente').id; assert.equal((await v('DELETE', '/api/vacaciones/' + pid)).s, 200);
+  // el otro operario no ve las ajenas
+  const mm = client(); await a('POST', '/api/personal', { nombre: 'Pau', usuario: 'pau', rol: 'operario', password: 'temp123', vacaciones: 20 });
+  await mm('POST', '/api/login', { usuario: 'pau', password: 'temp123' }); await mm('POST', '/api/password', { nueva: 'pau12345' });
+  assert.equal((await mm('GET', '/api/data')).j.vacaciones.length, 0);
+  assert.equal((await mm('POST', '/api/festivos', { fecha: '2026-11-20', nombre: 'x' })).s, 403);
+  // festivos editables por el admin: añadir cambia el cómputo
+  assert.equal((await a('POST', '/api/festivos', { fecha: '2026-11-20', nombre: 'Festivo local' })).s, 200);
+  assert.equal((await a('POST', '/api/festivos', { fecha: '2026-11-20', nombre: 'dup' })).s, 400);
+  assert.equal((await mm('POST', '/api/vacaciones', { desde: '2026-11-16', hasta: '2026-11-20' })).j.dias, 4);
+  const fid = (await a('GET', '/api/data')).j.festivos.find((f) => f.fecha === '2026-11-20').id;
+  assert.equal((await a('DELETE', '/api/festivos/' + fid)).s, 200);
+  assert.equal((await a('GET', '/api/data')).j.vacaciones.find((x) => x.uid !== mid2).dias, 5);
   assert.equal((await a('GET', '/')).s, 200);
   console.log('TODO OK'); srv.close();
 })().catch((e) => { console.error('FALLO', e); process.exit(1); });

@@ -11,16 +11,18 @@ const PORT = env.PORT || 3000;
 const SECRET = env.SESSION_SECRET || (env.MONDAY_MOCK ? 'dev-secret' : null);
 if (!SECRET) { console.error('Falta SESSION_SECRET'); process.exit(1); }
 const mock = !!env.MONDAY_MOCK;
-const B = mock ? { obras: 'obras', personal: 'personal', registros: 'registros', clientes: 'clientes' }
-  : { obras: env.BOARD_OBRAS, personal: env.BOARD_PERSONAL, registros: env.BOARD_REGISTROS, clientes: env.BOARD_CLIENTES };
-if (!mock && (!env.MONDAY_API_TOKEN || !B.obras || !B.personal || !B.registros || !B.clientes)) {
-  console.error('Faltan MONDAY_API_TOKEN, BOARD_OBRAS, BOARD_PERSONAL, BOARD_REGISTROS o BOARD_CLIENTES'); process.exit(1);
+const B = mock ? { obras: 'obras', personal: 'personal', registros: 'registros', clientes: 'clientes', vacaciones: 'vacaciones', festivos: 'festivos' }
+  : { obras: env.BOARD_OBRAS, personal: env.BOARD_PERSONAL, registros: env.BOARD_REGISTROS, clientes: env.BOARD_CLIENTES, vacaciones: env.BOARD_VACACIONES, festivos: env.BOARD_FESTIVOS };
+if (!mock && (!env.MONDAY_API_TOKEN || !B.obras || !B.personal || !B.registros || !B.clientes || !B.vacaciones || !B.festivos)) {
+  console.error('Faltan MONDAY_API_TOKEN o alguno de BOARD_OBRAS, BOARD_PERSONAL, BOARD_REGISTROS, BOARD_CLIENTES, BOARD_VACACIONES, BOARD_FESTIVOS'); process.exit(1);
 }
 const mon = mock ? makeMock() : makeMonday(env.MONDAY_API_TOKEN);
 
 const COLS = {
   obras: ['cliente', 'nif', 'direccion', 'ubicacion', 'tipo', 'desplazamiento', 'codigo', 'activa', 'clienteid', 'estado', 'importe', 'importefinal', 'fechaestado'],
-  personal: ['usuario', 'rol', 'salt', 'hash', 'mustchange', 'activo'],
+  personal: ['usuario', 'rol', 'salt', 'hash', 'mustchange', 'activo', 'vacaciones'],
+  vacaciones: ['uid', 'desde', 'hasta', 'estado', 'nota', 'resuelve', 'fechares'],
+  festivos: ['fecha', 'tipo'],
   clientes: ['nif', 'direccion', 'contacto', 'telefono', 'email', 'notas'],
   registros: ['obraid', 'obranombre', 'uid', 'nombreop', 'fecha', 'horas', 'entrada', 'salida', 'comida', 'trabajo'],
 };
@@ -44,7 +46,7 @@ const bust = (k) => { cache[k] = null; };
 /* ---------- conversión a la forma que usa la web ---------- */
 const bool = (v) => v === '1';
 const persOut = (r) => ({ id: r.id, nombre: r.nombre, usuario: r.usuario, rol: r.rol === 'admin' ? 'admin' : 'operario',
-  mustChange: bool(r.mustchange), activo: bool(r.activo), ts: r.ts });
+  mustChange: bool(r.mustchange), activo: bool(r.activo), vacaciones: Number(r.vacaciones) || 0, ts: r.ts });
 const ESTADOS = ['presupuesto_pendiente', 'presupuesto_enviado', 'aceptado', 'factura_pendiente', 'facturado'];
 const obraOut = (r, cli, adm) => {
   const o = { id: r.id, nombre: r.nombre, tipo: r.tipo, desplazamiento: Number(r.desplazamiento) || 0, codigo: r.codigo, activa: bool(r.activa), ts: r.ts };
@@ -54,6 +56,51 @@ const obraOut = (r, cli, adm) => {
     clienteId: c ? c.id : '', estado: ESTADOS.includes(r.estado) ? r.estado : 'presupuesto_pendiente', importe: Number(r.importe) || 0, importeFinal: Number(r.importefinal) || 0, fechaEstado: r.fechaestado });
 };
 const cliOut = (r) => ({ id: r.id, nombre: r.nombre, nif: r.nif, direccion: r.direccion, contacto: r.contacto, telefono: r.telefono, email: r.email, notas: r.notas, ts: r.ts });
+/* ---------- vacaciones ---------- */
+// Festivos por defecto: Cataluña + locales de Solsona. Fuentes: Orden EMT/66/2025 (2026), Orden EMT/52/2026 (2027), Orden EMT/208/2025 (locales 2026).
+// Los locales de Solsona de 2027 aún no estaban publicados: el administrador los añade en la app.
+const FESTIVOS_DEFECTO = [
+  ['2026-01-01', 'Año Nuevo'], ['2026-01-06', 'Reyes'], ['2026-04-03', 'Viernes Santo'], ['2026-04-06', 'Lunes de Pascua'],
+  ['2026-05-01', 'Fiesta del Trabajo'], ['2026-06-24', 'San Juan'], ['2026-08-15', 'Asunción'], ['2026-09-11', 'Diada de Cataluña'],
+  ['2026-10-12', 'Fiesta Nacional de España'], ['2026-12-08', 'Inmaculada Concepción'], ['2026-12-25', 'Navidad'], ['2026-12-26', 'San Esteban'],
+  ['2026-09-08', 'Fiesta Mayor de Solsona (local)', 'local'], ['2026-09-09', 'Fiesta Mayor de Solsona (local)', 'local'],
+  ['2027-01-01', 'Año Nuevo'], ['2027-01-06', 'Reyes'], ['2027-03-26', 'Viernes Santo'], ['2027-03-29', 'Lunes de Pascua'],
+  ['2027-05-01', 'Fiesta del Trabajo'], ['2027-06-24', 'San Juan'], ['2027-08-15', 'Asunción'], ['2027-09-11', 'Diada de Cataluña'],
+  ['2027-10-12', 'Fiesta Nacional de España'], ['2027-12-08', 'Inmaculada Concepción'], ['2027-12-25', 'Navidad'], ['2027-12-26', 'San Esteban'],
+];
+let seeding = null;
+async function festivosList() {
+  let list = await load('festivos');
+  if (!list.length) {
+    if (!seeding) seeding = (async () => {
+      for (const [fecha, nombre, tipo] of FESTIVOS_DEFECTO) await mon.create(B.festivos, nombre, { fecha, tipo: tipo || 'catalunya' });
+      bust('festivos');
+    })().finally(() => { seeding = null; });
+    await seeding;
+    list = await load('festivos');
+  }
+  return list;
+}
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const validDate = (s) => ISO.test(s || '') && !isNaN(Date.parse(s + 'T00:00:00Z')) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
+// días laborables (lunes a viernes, sin festivos) por año natural dentro de [desde, hasta]
+function workdays(desde, hasta, fset) {
+  const by = {}; let total = 0;
+  const end = Date.parse(hasta + 'T00:00:00Z');
+  for (let t = Date.parse(desde + 'T00:00:00Z'); t <= end; t += 86400000) {
+    const d = new Date(t), dow = d.getUTCDay();
+    if (dow === 0 || dow === 6) continue;
+    const iso = d.toISOString().slice(0, 10);
+    if (fset.has(iso)) continue;
+    const y = iso.slice(0, 4); by[y] = (by[y] || 0) + 1; total++;
+  }
+  return { total, by };
+}
+const vacOut = (v, personal, fset) => {
+  const w = workdays(v.desde, v.hasta, fset), p = personal.find((x) => x.id === v.uid);
+  return { id: v.id, uid: v.uid, nombre: p ? p.nombre : v.nombre, desde: v.desde, hasta: v.hasta, estado: v.estado || 'pendiente', nota: v.nota,
+    resuelve: v.resuelve, fechaRes: v.fechares, dias: w.total, porAnio: w.by, ts: v.ts };
+};
 const regOut = (r) => ({ id: r.id, obraId: r.obraid, obraNombre: r.obranombre, uid: r.uid, nombreOp: r.nombreop, fecha: r.fecha,
   horas: Number(r.horas) || 0, entrada: r.entrada, salida: r.salida, comida: r.comida !== '0', trabajo: r.trabajo, fotoIds: r.fotoIds || [], ts: r.ts });
 
@@ -138,13 +185,16 @@ app.post('/api/password', auth, wrap(async (req, res) => {
 
 app.get('/api/data', auth, active, wrap(async (req, res) => {
   const adm = req.user.rol === 'admin';
-  const [obras, personal, regs, clis] = await Promise.all([load('obras'), load('personal'), load('registros'), adm ? load('clientes') : []]);
+  const [obras, personal, regs, clis, vacs, fest] = await Promise.all([load('obras'), load('personal'), load('registros'), adm ? load('clientes') : [], load('vacaciones'), festivosList()]);
+  const fset = new Set(fest.map((f) => f.fecha));
   const reg = (adm ? regs : regs.filter((r) => r.uid === req.user.id)).map(regOut).sort((a, b) => b.ts - a.ts).slice(0, 3000);
   res.json({
     obras: obras.map((o) => obraOut(o, clis.find((c) => c.id === o.clienteid), adm)),
     registros: reg,
     personal: (adm ? personal : personal.filter((p) => p.id === req.user.id)).map(persOut),
     clientes: clis.map(cliOut),
+    vacaciones: (adm ? vacs : vacs.filter((v) => v.uid === req.user.id)).map((v) => vacOut(v, personal, fset)).sort((a, b) => b.ts - a.ts),
+    festivos: fest.map((f) => ({ id: f.id, fecha: f.fecha, nombre: f.nombre, tipo: f.tipo })).sort((a, b) => a.fecha.localeCompare(b.fecha)),
   });
 }));
 
@@ -218,6 +268,60 @@ app.delete('/api/registros/:id', auth, active, wrap(async (req, res) => {
   if (req.user.rol !== 'admin' && r.uid !== req.user.id) return res.status(403).json({ error: 'No permitido.' });
   await mon.remove(r.id); bust('registros'); res.json({ ok: true });
 }));
+/* ----- vacaciones ----- */
+async function usadoAnio(uid, year, vacs, fset, exceptId) {
+  let n = 0;
+  for (const v of vacs) {
+    if (v.uid !== uid || v.id === exceptId || !['pendiente', 'aprobada'].includes(v.estado || 'pendiente')) continue;
+    n += workdays(v.desde, v.hasta, fset).by[year] || 0;
+  }
+  return n;
+}
+app.post('/api/vacaciones', auth, active, wrap(async (req, res) => {
+  const { desde, hasta } = req.body, nota = String(req.body.nota || '').trim().slice(0, 500);
+  if (!validDate(desde) || !validDate(hasta)) return res.status(400).json({ error: 'Fechas no válidas.' });
+  if (hasta < desde) return res.status(400).json({ error: 'La fecha final no puede ser anterior a la inicial.' });
+  if (Date.parse(hasta) - Date.parse(desde) > 366 * 86400000) return res.status(400).json({ error: 'El rango es demasiado largo.' });
+  const fset = new Set((await festivosList()).map((f) => f.fecha));
+  const w = workdays(desde, hasta, fset);
+  if (!w.total) return res.status(400).json({ error: 'En ese rango no hay ningún día laborable.' });
+  const vacs = (await load('vacaciones')).filter((v) => v.uid === req.user.id && ['pendiente', 'aprobada'].includes(v.estado || 'pendiente'));
+  if (vacs.some((v) => desde <= v.hasta && hasta >= v.desde)) return res.status(400).json({ error: 'Ya tienes una solicitud que coincide con esas fechas.' });
+  const me = (await load('personal')).find((p) => p.id === req.user.id);
+  const asignados = Number(me && me.vacaciones) || 0;
+  for (const y of Object.keys(w.by)) {
+    const queda = asignados - await usadoAnio(req.user.id, y, vacs, fset);
+    if (w.by[y] > queda) return res.status(400).json({ error: `Te quedan ${Math.max(0, queda)} días en ${y} y pides ${w.by[y]}.` });
+  }
+  const r = await mon.create(B.vacaciones, req.user.nombre, { uid: req.user.id, desde, hasta, estado: 'pendiente', nota: { text: nota } });
+  bust('vacaciones'); res.json({ id: r.id, dias: w.total });
+}));
+app.patch('/api/vacaciones/:id', auth, active, admin, wrap(async (req, res) => {
+  const estado = req.body.estado;
+  if (!['pendiente', 'aprobada', 'rechazada'].includes(estado)) return res.status(400).json({ error: 'Estado no válido.' });
+  if (!(await load('vacaciones')).some((v) => v.id === req.params.id)) return res.status(404).json({ error: 'No existe la solicitud.' });
+  await mon.update(B.vacaciones, req.params.id, { estado, resuelve: estado === 'pendiente' ? '' : req.user.nombre, fechares: estado === 'pendiente' ? '' : today() });
+  bust('vacaciones'); res.json({ ok: true });
+}));
+app.delete('/api/vacaciones/:id', auth, active, wrap(async (req, res) => {
+  const v = (await load('vacaciones')).find((x) => x.id === req.params.id);
+  if (!v) return res.json({ ok: true });
+  const own = v.uid === req.user.id && (v.estado || 'pendiente') === 'pendiente';
+  if (req.user.rol !== 'admin' && !own) return res.status(403).json({ error: 'Solo puedes cancelar tus solicitudes pendientes.' });
+  await mon.remove(v.id); bust('vacaciones'); res.json({ ok: true });
+}));
+app.post('/api/festivos', auth, active, admin, wrap(async (req, res) => {
+  const fecha = req.body.fecha, nombre = String(req.body.nombre || '').trim().slice(0, 100);
+  if (!validDate(fecha)) return res.status(400).json({ error: 'Fecha no válida.' });
+  if (!nombre) return res.status(400).json({ error: 'Pon un nombre al festivo.' });
+  if ((await festivosList()).some((f) => f.fecha === fecha)) return res.status(400).json({ error: 'Ese día ya está como festivo.' });
+  const r = await mon.create(B.festivos, nombre, { fecha, tipo: 'local' });
+  bust('festivos'); res.json({ id: r.id });
+}));
+app.delete('/api/festivos/:id', auth, active, admin, wrap(async (req, res) => {
+  await mon.remove(req.params.id); bust('festivos'); res.json({ ok: true });
+}));
+
 app.get('/api/fotos/:id', auth, active, wrap(async (req, res) => {
   const id = String(req.params.id);
   const r = (await load('registros')).find((x) => (x.fotoIds || []).includes(id));
@@ -254,6 +358,7 @@ app.delete('/api/clientes/:id', auth, active, admin, wrap(async (req, res) => {
   await mon.remove(req.params.id); bust('clientes'); bust('obras'); res.json({ ok: true });
 }));
 
+const diasVac = (v) => Math.max(0, Math.min(366, Math.round((Number(String(v == null ? 0 : v).replace(',', '.')) || 0) * 2) / 2));
 /* ----- personal (admin) ----- */
 app.post('/api/personal', auth, active, admin, wrap(async (req, res) => {
   const nombre = String(req.body.nombre || '').trim().slice(0, 100), usuario = String(req.body.usuario || '').trim().toLowerCase();
@@ -262,13 +367,14 @@ app.post('/api/personal', auth, active, admin, wrap(async (req, res) => {
   if (!/^[a-z0-9._-]{3,}$/.test(usuario)) return res.status(400).json({ error: 'Usuario no válido.' });
   if (pw.length < 6) return res.status(400).json({ error: 'La contraseña temporal tiene que tener al menos 6 caracteres.' });
   if ((await load('personal')).some((p) => p.usuario === usuario)) return res.status(400).json({ error: 'Ya existe un usuario con ese nombre de usuario.' });
-  const r = await mon.create(B.personal, nombre, { usuario, rol, salt: '', hash: await bcrypt.hash(pw, 10), mustchange: '1', activo: '1' });
+  const r = await mon.create(B.personal, nombre, { usuario, rol, salt: '', hash: await bcrypt.hash(pw, 10), mustchange: '1', activo: '1', vacaciones: String(diasVac(req.body.vacaciones)) });
   bust('personal'); res.json({ id: r.id });
 }));
 app.patch('/api/personal/:id', auth, active, admin, wrap(async (req, res) => {
   const id = req.params.id, b = req.body, vals = {};
   if (id === req.user.id && ('rol' in b || 'activo' in b)) return res.status(400).json({ error: 'No puedes cambiar tu propio rol ni desactivarte.' });
   if ('rol' in b) vals.rol = b.rol === 'admin' ? 'admin' : 'operario';
+  if ('vacaciones' in b) vals.vacaciones = String(diasVac(b.vacaciones));
   if ('activo' in b) vals.activo = b.activo ? '1' : '0';
   if (b.password != null) {
     if (String(b.password).length < 6) return res.status(400).json({ error: 'Contraseña demasiado corta.' });

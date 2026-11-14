@@ -19,6 +19,10 @@ services:
         value: "5107838013"
       - key: BOARD_CLIENTES
         value: "5107839069"
+      - key: BOARD_VACACIONES
+        value: "5107839729"
+      - key: BOARD_FESTIVOS
+        value: "5107839730"
       - key: MONDAY_API_TOKEN
         sync: false
       - key: INITIAL_ADMIN_USER

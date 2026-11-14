@@ -159,6 +159,23 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
 .st-facturado{background:#e8e2d6;color:#5a4a33}
 .cl-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .cl-imp{font-weight:700;white-space:nowrap}
+.st-pendiente{background:#fdeccb;color:#8a5a00}
+.st-aprobada{background:#dcefdc;color:#1d5c2c}
+.st-rechazada{background:#f8d9d9;color:#9b1c1c}
+.t.ok{background:#e9f5e9;border-color:#bfe0bf}
+.vrow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.vrow:first-of-type{border-top:0}
+.vbtns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.vbtns .btn{flex:1;padding:8px 12px;font-size:13px;text-align:center}
+.vbtns .ok{background:var(--ok)}
+.fest-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+.fest-row:first-child{border-top:0}
+details.card>summary{cursor:pointer;font-weight:700;list-style:none}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::before{content:"▸ ";color:var(--mut)}
+details.card[open]>summary::before{content:"▾ "}
+.pvac{display:flex;align-items:center;gap:8px;margin-top:6px}
+.pvac input{width:80px;text-align:right}
 .imp-row{margin-top:10px}
 .imp-row label{margin-top:0}
 .imp{position:relative}
@@ -197,6 +214,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
     <button data-t="panel" class="adm" hidden>Panel</button>
     <button data-t="obras" class="adm" hidden>Obras</button>
     <button data-t="clientes" class="adm" hidden>Clientes</button>
+    <button data-t="vacaciones">Vacaciones</button>
     <button data-t="personal" class="adm" hidden>Personal</button>
   </nav>
   <div class="hright">
@@ -363,6 +381,40 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
     </div>
     <div id="cl-list"></div>
   </section>
+  <section id="s-vacaciones">
+    <div class="card">
+      <label for="v-anio" style="margin-top:0">Año</label>
+      <select id="v-anio"></select>
+      <div class="todo" id="v-saldo" style="margin-top:12px"></div>
+    </div>
+    <div id="v-pend"></div>
+    <div class="card">
+      <b>Pedir vacaciones</b>
+      <div class="sub" style="margin-top:4px">Solo cuentan los días laborables: no se descuentan fines de semana ni festivos.</div>
+      <div class="grid2">
+        <div><label for="v-desde">Desde</label><input type="date" id="v-desde"></div>
+        <div><label for="v-hasta">Hasta (incluido)</label><input type="date" id="v-hasta"></div>
+      </div>
+      <div class="sub" id="v-calc" style="margin-top:8px;min-height:18px"></div>
+      <label for="v-nota">Comentario (opcional)</label>
+      <textarea id="v-nota" rows="2"></textarea>
+      <button class="btn big" id="v-pedir" type="button">Solicitar vacaciones</button>
+    </div>
+    <div id="v-mis"></div>
+    <div id="v-team"></div>
+    <details class="card" id="v-fest">
+      <summary id="v-fest-t">Festivos</summary>
+      <div class="sub" style="margin:6px 0 8px">Por defecto: festivos de Cataluña y locales de Solsona. No cuentan como día de vacaciones.</div>
+      <div id="v-fest-list"></div>
+      <div id="v-fest-add" hidden>
+        <div class="grid2" style="margin-top:10px">
+          <div><label for="vf-fecha">Fecha</label><input type="date" id="vf-fecha"></div>
+          <div><label for="vf-nombre">Nombre</label><input id="vf-nombre" autocomplete="off" placeholder="p. ej. Fiesta local"></div>
+        </div>
+        <button class="btn sec" id="vf-add" type="button" style="margin-top:10px;width:100%">Añadir festivo</button>
+      </div>
+    </details>
+  </section>
   <section id="s-personal">
     <div id="p-msg"></div>
     <div class="card">
@@ -373,6 +425,8 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
         <div><label for="p-user">Usuario (para entrar)</label><input id="p-user" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="p. ej. jperez"></div>
         <div><label for="p-rol">Tipo</label><select id="p-rol"><option value="operario">Operario</option><option value="admin">Administrador</option></select></div>
       </div>
+      <label for="p-vac">Días de vacaciones al año</label>
+      <input id="p-vac" inputmode="decimal" autocomplete="off" value="22">
       <label for="p-pass">Contraseña temporal</label>
       <input id="p-pass" autocomplete="off" spellcheck="false" placeholder="Mínimo 6 caracteres">
       <div class="sub" style="margin-top:6px">Se la das en persona. Tendrá que cambiarla la primera vez que entre.</div>
@@ -399,7 +453,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-he
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let me=null,isAdmin=false,canWrite=true;
-let clientes=[],obras=[],regs=[],names={},pending=[],tab='nuevo',saving=false;
+let vacs=[],festivos=[],clientes=[],obras=[],regs=[],names={},pending=[],tab='nuevo',saving=false;
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const fmtDate=s=>{const p=(s||'').split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s};
 const fmtH=n=>(Math.round(n*100)/100).toString().replace('.',',');
@@ -414,7 +468,7 @@ async function api(method,url,body){
 async function refresh(){
   const d=await api('GET','/api/data');
   obras=d.obras.sort((a,b)=>(b.ts||0)-(a.ts||0)||String(b.codigo||'').localeCompare(String(a.codigo||'')));
-  regs=d.registros;clientes=d.clientes||[];personal=d.personal.sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
+  regs=d.registros;clientes=d.clientes||[];vacs=d.vacaciones||[];festivos=d.festivos||[];personal=d.personal.sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
   snapNames={};regs.forEach(r=>{if(r.nombreOp)snapNames[r.uid]=r.nombreOp});
   calc=computeHoras(regs);
   syncSession();
@@ -1229,7 +1283,7 @@ $('#dlBtn').onclick=e=>{e.stopPropagation();$('#dlMenu').hidden=!$('#dlMenu').hi
 $('#dlMenu').addEventListener('click',()=>{$('#dlMenu').hidden=true});
 document.addEventListener('click',()=>{$('#dlMenu').hidden=true});
 
-function redraw(){drawSelects();drawMis();drawPanel();if(isAdmin){drawObras();drawClientes();drawPersonal()}}
+function redraw(){drawSelects();drawMis();drawPanel();drawVac();if(isAdmin){drawObras();drawClientes();drawPersonal()}}
 
 /* ---------- contraseñas ---------- */
 function genPw(){
@@ -1260,11 +1314,12 @@ const TABICON={
   nuevo:SV('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8.5v7M8.5 12h7"/>'),
   mis:SV('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M8 3v4M16 3v4M4 10h16"/>'),
   panel:SV('<path d="M5 20V11M12 20V5M19 20v-6"/>'),
+  vacaciones:SV('<circle cx="12" cy="12" r="3.6"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18"/>'),
   clientes:SV('<rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/>'),
   obras:SV('<path d="M3.5 11.5 12 4l8.5 7.5"/><path d="M6 10.5V20h12v-9.5M10 20v-5h4v5"/>'),
   personal:SV('<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17 14.8c2.2.5 3.5 2.3 3.5 4.7"/>')
 };
-const TABSHORT={nuevo:'Nuevo',mis:'Registros',panel:'Panel',obras:'Obras',clientes:'Clientes',personal:'Personal'};
+const TABSHORT={nuevo:'Nuevo',mis:'Registros',panel:'Panel',obras:'Obras',clientes:'Clientes',vacaciones:'Vacac.',personal:'Personal'};
 function buildBnav(){
   const bar=$('#bnav');if(!bar)return;bar.innerHTML='';
   document.querySelectorAll('#nav button').forEach(nb=>{
@@ -1325,7 +1380,7 @@ function enterApp(){
 function logout(msg){
   const was=sess;
   sess=null;me=null;isAdmin=false;dataStarted=false;clearInterval(pollT);
-  obras=[];regs=[];personal=[];clientes=[];
+  obras=[];regs=[];personal=[];clientes=[];vacs=[];festivos=[];
   if(was)api('POST','/api/logout').catch(()=>{});
   $('#l-user').value='';
   showLogin();
@@ -1364,6 +1419,149 @@ function syncSession(){
     setWho();
     if(!isAdmin&&['panel','obras','clientes','personal'].includes(tab))setTab('nuevo');
   }
+}
+
+/* ---------- vacaciones ---------- */
+let vAnio=String(new Date().getFullYear());
+const rango=(a,b)=>a===b?fmtDate(a):fmtDate(a)+' – '+fmtDate(b);
+const dowES=iso=>new Date(iso+'T00:00:00Z').toLocaleDateString('es-ES',{weekday:'short',timeZone:'UTC'});
+const fnum=n=>String(Math.round(n*10)/10).replace('.',',');
+function wdays(desde,hasta){
+  const fset=new Set(festivos.map(f=>f.fecha)),by={};let total=0;
+  const end=Date.parse(hasta+'T00:00:00Z');
+  for(let t=Date.parse(desde+'T00:00:00Z');t<=end;t+=86400000){
+    const d=new Date(t),w=d.getUTCDay();if(w===0||w===6)continue;
+    const iso=d.toISOString().slice(0,10);if(fset.has(iso))continue;
+    const y=iso.slice(0,4);by[y]=(by[y]||0)+1;total++;
+  }
+  return {total,by};
+}
+function saldo(uid,year){
+  const p=personal.find(x=>x.id===uid),asig=p?(p.vacaciones||0):0;
+  let ap=0,pe=0;
+  vacs.forEach(v=>{if(v.uid!==uid)return;const n=(v.porAnio||{})[year]||0;if(v.estado==='aprobada')ap+=n;else if(v.estado==='pendiente')pe+=n});
+  return {asig,ap,pe,queda:asig-ap-pe};
+}
+function vCalc(){
+  const d=$('#v-desde').value,h=$('#v-hasta').value,el=$('#v-calc');
+  if(!d||!h){el.textContent='';return}
+  if(h<d){el.textContent='La fecha final no puede ser anterior a la inicial.';return}
+  const w=wdays(d,h);
+  if(!w.total){el.textContent='En ese rango no hay ningún día laborable.';return}
+  const parts=Object.keys(w.by).map(y=>{const s=saldo(me,y);return w.by[y]+' en '+y+' (te quedarían '+fnum(s.queda-w.by[y])+')'});
+  el.innerHTML='<b>'+w.total+' día'+(w.total===1?'':'s')+' laborable'+(w.total===1?'':'s')+'</b> · '+esc(parts.join(' · '));
+}
+['#v-desde','#v-hasta'].forEach(i=>$(i).addEventListener('change',()=>{
+  if(i==='#v-desde'&&$('#v-desde').value&&(!$('#v-hasta').value||$('#v-hasta').value<$('#v-desde').value))$('#v-hasta').value=$('#v-desde').value;
+  vCalc();
+}));
+$('#v-anio').onchange=()=>{vAnio=$('#v-anio').value;drawVac()};
+$('#v-pedir').onclick=async()=>{
+  const desde=$('#v-desde').value,hasta=$('#v-hasta').value;
+  if(!desde||!hasta)return notice('Indica las fechas.','bad');
+  try{
+    const r=await api('POST','/api/vacaciones',{desde,hasta,nota:$('#v-nota').value});
+    await refresh();$('#v-desde').value='';$('#v-hasta').value='';$('#v-nota').value='';$('#v-calc').textContent='';
+    notice('Solicitud enviada ('+r.dias+' día'+(r.dias===1?'':'s')+') ✔','ok');
+  }catch(e){notice(e.status?e.message:'No se pudo enviar la solicitud.','bad')}
+};
+$('#vf-add').onclick=async()=>{
+  try{await api('POST','/api/festivos',{fecha:$('#vf-fecha').value,nombre:$('#vf-nombre').value});$('#vf-fecha').value='';$('#vf-nombre').value='';await refresh();notice('Festivo añadido ✔','ok')}
+  catch(e){notice(e.status?e.message:'No se pudo añadir.','bad')}
+};
+function vState(v){return '<span class="st st-'+v.estado+'">'+({pendiente:'Pendiente',aprobada:'Aprobada',rechazada:'Rechazada'}[v.estado]||v.estado)+'</span>'}
+function vInfo(v){
+  return '<div><b>'+esc(rango(v.desde,v.hasta))+'</b> <span class="sub">· '+v.dias+' día'+(v.dias===1?'':'s')+'</span></div>'
+    +(v.nota?'<div class="sub">'+esc(v.nota)+'</div>':'')
+    +(v.estado!=='pendiente'&&v.resuelve?'<div class="sub">'+(v.estado==='aprobada'?'Aprobada':'Rechazada')+' por '+esc(v.resuelve)+(v.fechaRes?' el '+fmtDate(v.fechaRes):'')+'</div>':'');
+}
+function vAct(txt,cls,fn){const b=document.createElement('button');b.className='btn '+cls;b.textContent=txt;b.onclick=fn;return b}
+function setVac(v,estado){api('PATCH','/api/vacaciones/'+v.id,{estado}).then(refresh).then(()=>notice(estado==='aprobada'?'Solicitud aprobada ✔':'Solicitud rechazada','ok')).catch(()=>notice('No se pudo actualizar.','bad'))}
+async function delVac(v,adm){
+  if(!await confirmDlg(adm?'¿Eliminar la solicitud de '+v.nombre+'?':'¿Cancelar tu solicitud?',rango(v.desde,v.hasta)+' ('+v.dias+' día'+(v.dias===1?'':'s')+').',adm?'Eliminar':'Cancelar solicitud'))return;
+  try{await api('DELETE','/api/vacaciones/'+v.id);await refresh();notice(adm?'Solicitud eliminada ✔':'Solicitud cancelada ✔','ok')}catch(_){notice('No se pudo cancelar.','bad')}
+}
+function drawVac(){
+  if(!$('#v-anio')||!sess)return;
+  const cur=new Date().getFullYear();
+  const yrs=[...new Set([cur,cur+1].concat(festivos.map(f=>+f.fecha.slice(0,4))).concat(vacs.flatMap(v=>Object.keys(v.porAnio||{}).map(Number))))].sort((a,b)=>a-b);
+  if(!yrs.includes(+vAnio))vAnio=String(cur);
+  $('#v-anio').innerHTML=yrs.map(y=>'<option value="'+y+'"'+(String(y)===vAnio?' selected':'')+'>'+y+'</option>').join('');
+  const sd=saldo(me,vAnio);
+  $('#v-saldo').innerHTML='<div class="t"><b>'+fnum(sd.asig)+'</b>Días asignados</div>'
+    +'<div class="t"><b>'+fnum(sd.ap)+'</b>Aprobados</div>'
+    +'<div class="t'+(sd.pe?' warn':'')+'"><b>'+fnum(sd.pe)+'</b>Pendientes de aprobar</div>'
+    +'<div class="t ok"><b>'+fnum(sd.queda)+'</b>Te quedan</div>';
+  vCalc();
+  // por aprobar (admin)
+  const pe=$('#v-pend');pe.innerHTML='';
+  if(isAdmin){
+    const lst=vacs.filter(v=>v.estado==='pendiente').sort((a,b)=>a.desde.localeCompare(b.desde));
+    const c=document.createElement('div');c.className='card';
+    c.innerHTML='<b>Solicitudes por aprobar'+(lst.length?' ('+lst.length+')':'')+'</b>'+(lst.length?'':'<div class="sub" style="margin-top:4px">No hay solicitudes pendientes.</div>');
+    lst.forEach(v=>{
+      const w=document.createElement('div');w.style.cssText='margin-top:10px;padding-top:10px;border-top:1px solid var(--line)';
+      const yy=Object.keys(v.porAnio||{}).map(y=>{const s=saldo(v.uid,y);return y+': quedan '+fnum(s.asig-s.ap)+' sin contar pendientes'}).join(' · ');
+      w.innerHTML='<div><b>'+esc(v.nombre)+'</b></div>'+vInfo(v)+'<div class="sub">'+esc(yy)+'</div>';
+      const bt=document.createElement('div');bt.className='vbtns';
+      bt.append(vAct('Aprobar','ok',()=>setVac(v,'aprobada')),vAct('Rechazar','del',()=>setVac(v,'rechazada')));
+      w.appendChild(bt);c.appendChild(w);
+    });
+    pe.appendChild(c);
+  }
+  // mis solicitudes
+  const mis=$('#v-mis');mis.innerHTML='';
+  const mine=vacs.filter(v=>v.uid===me).sort((a,b)=>b.desde.localeCompare(a.desde));
+  const mc=document.createElement('div');mc.className='card';
+  mc.innerHTML='<b>Mis solicitudes</b>'+(mine.length?'':'<div class="sub" style="margin-top:4px">Todavía no has pedido vacaciones.</div>');
+  mine.forEach(v=>{
+    const r=document.createElement('div');r.className='vrow';
+    const l=document.createElement('div');l.innerHTML=vInfo(v);r.appendChild(l);
+    const rt=document.createElement('div');rt.style.cssText='text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end';
+    rt.innerHTML=vState(v);
+    if(v.estado==='pendiente')rt.appendChild(vAct('Cancelar','del',()=>delVac(v,false)));
+    r.appendChild(rt);mc.appendChild(r);
+  });
+  mis.appendChild(mc);
+  // equipo (admin)
+  const tm=$('#v-team');tm.innerHTML='';
+  if(isAdmin){
+    const c=document.createElement('div');c.className='card';c.innerHTML='<b>Equipo · '+esc(vAnio)+'</b>';
+    personal.filter(p=>p.activo!==false).forEach(p=>{
+      const s=saldo(p.id,vAnio),r=document.createElement('div');r.className='vrow';
+      r.innerHTML='<div><b>'+esc(p.nombre)+'</b><div class="sub">'+fnum(s.asig)+' asignados · '+fnum(s.ap)+' aprobados'+(s.pe?' · '+fnum(s.pe)+' pendientes':'')+'</div></div><div class="pill" style="margin:0">Quedan '+fnum(s.queda)+'</div>';
+      c.appendChild(r);
+    });
+    const hist=vacs.filter(v=>v.estado!=='pendiente'&&(v.porAnio||{})[vAnio]!==undefined).sort((a,b)=>b.desde.localeCompare(a.desde));
+    if(hist.length){
+      const h=document.createElement('div');h.style.marginTop='14px';h.innerHTML='<div class="sub" style="font-weight:700">Solicitudes resueltas</div>';
+      hist.forEach(v=>{
+        const r=document.createElement('div');r.className='vrow';
+        const l=document.createElement('div');l.innerHTML='<div><b>'+esc(v.nombre)+'</b></div>'+vInfo(v);r.appendChild(l);
+        const rt=document.createElement('div');rt.style.cssText='text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end';
+        rt.innerHTML=vState(v);rt.appendChild(vAct('Eliminar','del',()=>delVac(v,true)));
+        r.appendChild(rt);h.appendChild(r);
+      });
+      c.appendChild(h);
+    }
+    tm.appendChild(c);
+  }
+  // festivos
+  $('#v-fest-t').textContent='Festivos '+vAnio;
+  const fl=$('#v-fest-list');fl.innerHTML='';
+  const ff=festivos.filter(f=>f.fecha.startsWith(vAnio+'-'));
+  if(!ff.length)fl.innerHTML='<div class="sub">No hay festivos cargados para este año.'+(isAdmin?' Añádelos abajo.':'')+'</div>';
+  ff.forEach(f=>{
+    const r=document.createElement('div');r.className='fest-row';
+    const wk=['sáb','dom'].includes(dowES(f.fecha).replace('.',''));
+    r.innerHTML='<div><b>'+fmtDate(f.fecha)+'</b> <span class="sub">'+esc(dowES(f.fecha))+'</span> · '+esc(f.nombre)+(f.tipo==='local'?' <span class="pill" style="margin:0">Local</span>':'')+(wk?' <span class="sub">(fin de semana)</span>':'')+'</div>';
+    if(isAdmin)r.appendChild(vAct('Quitar','del',async()=>{
+      if(!await confirmDlg('¿Quitar este festivo?',fmtDate(f.fecha)+' · '+f.nombre,'Quitar'))return;
+      try{await api('DELETE','/api/festivos/'+f.id);await refresh()}catch(_){notice('No se pudo quitar.','bad')}
+    }));
+    fl.appendChild(r);
+  });
+  $('#v-fest-add').hidden=!isAdmin;
 }
 
 /* ---------- clientes (admin) ---------- */
@@ -1424,9 +1622,9 @@ $('#p-crear').onclick=async()=>{
   if(personal.some(p=>p.usuario===usuario))return pmsg('Ya existe un usuario con ese nombre de usuario.','bad');
   if(pw.length<6)return pmsg('La contraseña temporal tiene que tener al menos 6 caracteres.','bad');
   try{
-    await api('POST','/api/personal',{nombre,usuario,rol,password:pw});await refresh();
+    await api('POST','/api/personal',{nombre,usuario,rol,password:pw,vacaciones:$('#p-vac').value});await refresh();
     pmsg('Usuario «'+usuario+'» creado. Contraseña temporal: '+pw+' — entrégasela en persona; tendrá que cambiarla al entrar.','ok');
-    ['p-nombre','p-user'].forEach(i=>$('#'+i).value='');$('#p-rol').value='operario';$('#p-pass').value='';
+    ['p-nombre','p-user'].forEach(i=>$('#'+i).value='');$('#p-rol').value='operario';$('#p-pass').value='';$('#p-vac').value='22';
   }catch(e){pmsg(e.status?e.message:'No se pudo crear el usuario.','bad')}
 };
 async function resetPw(p){
@@ -1450,6 +1648,17 @@ function drawPersonal(){
     const c=document.createElement('div');c.className='card row'+(p.activo===false?' closed':'');
     const estado=p.activo===false?'Desactivado':(p.mustChange?'Pendiente de cambiar la contraseña':'Activo');
     c.innerHTML='<div style="flex:1"><b>'+esc(p.nombre)+'</b> <span class="pill">'+(p.rol==='admin'?'Administrador':'Operario')+'</span><div class="sub">Usuario: '+esc(p.usuario)+' · '+estado+(self?' · (tú)':'')+'</div></div>';
+    const vw=document.createElement('div');vw.className='pvac';
+    vw.innerHTML='<span class="sub" style="margin:0">Vacaciones (días al año)</span><input inputmode="decimal" autocomplete="off" aria-label="Días de vacaciones al año">';
+    const vi=vw.querySelector('input');vi.value=String(p.vacaciones||0).replace('.',',');
+    vi.onkeydown=e=>{if(e.key==='Enter')vi.blur()};
+    vi.onchange=()=>{
+      const n=Number(vi.value.trim().replace(',','.'));
+      if(isNaN(n)||n<0||n>366){vi.value=String(p.vacaciones||0).replace('.',',');return pmsg('Días de vacaciones no válidos.','bad')}
+      if(n===(p.vacaciones||0))return;
+      api('PATCH','/api/personal/'+p.id,{vacaciones:n}).then(refresh).then(()=>pmsg('Vacaciones de '+p.nombre+' actualizadas ✔','ok')).catch(()=>pmsg('No se pudo guardar.','bad'));
+    };
+    c.firstChild.appendChild(vw);
     const col=document.createElement('div');col.className='pcol';
     const mk=(txt,cls,fn,dis)=>{const b=document.createElement('button');b.className='btn '+cls;b.textContent=txt;b.disabled=!!dis;b.onclick=fn;col.appendChild(b)};
     mk('Restablecer contraseña','sec',()=>resetPw(p));

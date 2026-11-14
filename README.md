@@ -11,6 +11,8 @@ Node/Express + **Monday** como base de datos (tableros *DMA - Obras*, *DMA - Per
 | `BOARD_PERSONAL` | 5107838012 |
 | `BOARD_REGISTROS` | 5107838013 |
 | `BOARD_CLIENTES` | 5107839069 |
+| `BOARD_VACACIONES` | 5107839729 |
+| `BOARD_FESTIVOS` | 5107839730 |
 | `SESSION_SECRET` | cadena aleatoria larga |
 | `INITIAL_ADMIN_USER` / `INITIAL_ADMIN_PASSWORD` / `INITIAL_ADMIN_NAME` | primer administrador (se crea solo si el tablero Personal está vacío; pide cambiar la contraseña al entrar) |
 
